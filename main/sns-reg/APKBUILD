@@ -1,0 +1,26 @@
+# Maintainer: Yassine Oudjana (Tooniis) <y.oudjana@protonmail.com>
+pkgname=sns-reg
+pkgver=0.1
+pkgrel=0
+pkgdesc="Qualcomm Sensor Registry Server"
+url="https://gitlab.com/msm8996-mainline/sns-reg"
+arch="armv7 aarch64"
+license="GPL-3.0-or-later"
+makedepends="scons qrtr-dev"
+source="$pkgname-$pkgver.zip::$url/-/archive/$pkgver/$pkgname-$pkgver.zip"
+options="!check"
+
+build() {
+	pwd
+	scons
+}
+
+package() {
+	install -Dm755 "$pkgname" "$pkgdir/usr/sbin/$pkgname"
+	install -Dm755 "$pkgname.initd" "$pkgdir/etc/init.d/$pkgname"
+	install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/COPYING"
+}
+
+sha512sums="
+810357d9b7b204c8d875107a17db528c387ceb246f1eea3176877daaec74822f930c060f5e7be613186f612457a68bf738e48ac5cc18a498d44c5bcb484ba457  sns-reg-0.1.zip
+"
