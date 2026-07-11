@@ -1,0 +1,69 @@
+# Reference: <https://postmarketos.org/vendorkernel>
+# Kernel config based on: arch/arm64/configs/defconfig (with USB gadget,
+# pstore and Qualcomm UFS/SDHCI/QMP-PHY drivers forced built-in)
+maintainer="Lance <Gero3977@gmail.com>"
+_flavor="lge-joan"
+pkgname=linux-$_flavor
+pkgver=7.2.0_rc2
+pkgrel=1
+_commit="ce78c1369cbe4026d6b88d7d12707db5056dcb92"
+pkgdesc="LG V30 (joan) mainline kernel fork"
+arch="aarch64"
+_carch="arm64"
+_config="config-$_flavor.$arch"
+url="https://github.com/ShapeShifter499/linux-lg-v30-joan"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps
+	pmb:cross-native
+"
+makedepends="
+	bash
+	bison
+	findutils
+	flex
+	elfutils-dev
+	zlib-dev
+	linux-headers
+	openssl-dev
+	pahole
+	perl
+	python3
+	postmarketos-installkernel
+	xz
+"
+
+# Source
+source="
+	$url/archive/$_commit/linux-lg-v30-joan-$_commit.tar.gz
+	$_config
+"
+builddir="$srcdir/linux-lg-v30-joan-$_commit"
+
+prepare() {
+	default_prepare
+	cp "$srcdir/config-$_flavor.$arch" .config
+}
+
+build() {
+	unset LDFLAGS
+	make ARCH="$_carch" CC="${CC:-gcc}" \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1))-$_flavor"
+}
+
+package() {
+	mkdir -p "$pkgdir"/boot
+
+	make zinstall modules_install dtbs_install \
+		ARCH="$_carch" \
+		INSTALL_PATH="$pkgdir"/boot \
+		INSTALL_MOD_PATH="$pkgdir" \
+		INSTALL_MOD_STRIP=1 \
+		INSTALL_DTBS_PATH="$pkgdir/boot/dtbs"
+	rm -f "$pkgdir"/lib/modules/*/build "$pkgdir"/lib/modules/*/source
+
+	install -D "$builddir"/include/config/kernel.release 		"$pkgdir"/usr/share/kernel/$_flavor/kernel.release
+}
+sha512sums="
+6c84323ef5141e0e33a6e5dc71702ae2c73196bedae02fbb4a409a37592ea2957cd310abcd65bca1391b88331ec1e2ca6790cf357ab8b545fa9686c5b93c18e9  linux-lg-v30-joan-ce78c1369cbe4026d6b88d7d12707db5056dcb92.tar.gz
+43601c64012729a389a99e31d7002786c13a38989742dd259f8e226369395779606c77dffd65c27a2f9b8ac8f9406e1c2d2a120b45f0792b22358c6ae69f8a74  config-lge-joan.aarch64
+"
