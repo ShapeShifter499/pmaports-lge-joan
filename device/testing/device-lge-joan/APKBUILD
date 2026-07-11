@@ -1,0 +1,28 @@
+# Reference: <https://postmarketos.org/devicepkg>
+maintainer="Lance <Gero3977@gmail.com>"
+pkgname=device-lge-joan
+pkgdesc="LG V30"
+pkgver=1
+pkgrel=2
+url="https://postmarketos.org"
+license="MIT"
+arch="aarch64"
+options="!check !archcheck"
+depends="
+	linux-lge-joan
+	mkbootimg
+	postmarketos-base
+"
+makedepends="devicepkg-dev"
+source="deviceinfo"
+
+build() {
+	devicepkg_build $startdir $pkgname
+}
+
+package() {
+	devicepkg_package $startdir $pkgname
+}
+sha512sums="
+df7c34a56eb107139f3a9389ed57567d6a0953d6ce367b07171ae46fc615a706fe6769c07588e88307cf5120cc6cf0f61bf1b60506226586cd50c33fb028d101  deviceinfo
+"
