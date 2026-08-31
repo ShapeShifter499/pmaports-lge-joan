@@ -26,13 +26,18 @@ V30 with an unlocked bootloader.
 git clone https://github.com/ShapeShifter499/pmaports-lge-joan
 cd pmaports-lge-joan
 git remote add upstream https://gitlab.postmarketos.org/postmarketOS/pmaports.git
+git fetch --depth 1 upstream main
 cd ..
 pmbootstrap -p "$PWD/pmaports-lge-joan" init
 ```
 
-The `git remote add` is required, not optional. pmbootstrap identifies a
-pmaports checkout by looking for a remote whose **URL** is upstream pmaports;
-a plain clone of this fork only has the GitHub URL, so `init` fails with:
+Both git commands are required. pmbootstrap needs upstream pmaports reachable
+from this clone for two separate reasons, and skipping either gives a
+different error.
+
+It identifies a pmaports checkout by searching the remotes for one whose
+**URL** is upstream pmaports. A plain clone of this fork only carries the
+GitHub URL, so without `git remote add`:
 
 ```
 ERROR: pmaports: could not find remote name for any URL
@@ -40,9 +45,18 @@ ERROR: pmaports: could not find remote name for any URL
 in git repository: /path/to/pmaports-lge-joan
 ```
 
-The remote's name does not matter and it never has to be fetched — only the
-URL is matched. If you already hit that error, add the remote to your existing
-clone and re-run `init`.
+It then reads the release channel definitions with
+`git show <remote>/main:channels.cfg`, which needs that remote actually
+fetched. With the remote added but not fetched:
+
+```
+ERROR: Failed to read channels.cfg from 'upstream/main' branch of your
+local pmaports clone
+```
+
+The remote's name does not matter — only its URL is matched. `--depth 1` is
+enough; the full upstream history is not needed. If you have already hit
+either error, run both commands in your existing clone and re-run `init`.
 
 Answer the device prompts with vendor `lge` and codename `joan`.
 
