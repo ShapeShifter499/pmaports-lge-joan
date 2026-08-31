@@ -7,7 +7,7 @@ mainline port. Upstream's own README follows below.
 | package | what it is |
 |---|---|
 | `device/testing/device-lge-joan` | device package and `deviceinfo` — fastboot, `qcom/msm8998-lge-joan` |
-| `device/testing/linux-lge-joan` | mainline kernel, pinned to a commit of [`ShapeShifter499/linux-lg-v30-joan`](https://github.com/ShapeShifter499/linux-lg-v30-joan) |
+| `device/testing/linux-lge-joan` | mainline kernel, pinned to a commit of [`ShapeShifter499/linux-lg-v30-joan`](https://github.com/ShapeShifter499/linux-lg-v30-joan), with the joan GPU/display enablement series carried as patches |
 
 Everything else in this tree is unmodified upstream pmaports.
 
@@ -76,8 +76,11 @@ They are in
 | `joan-imsd`, `lge-joan-volte` | IMS/VoLTE — see that repo's `FIRST-INSTALL-VOLTE.md` |
 
 `device-lge-joan` on this branch does **not** depend on any of them, so a plain
-`pmbootstrap install` produces an image without firmware. To include them, copy
-the package directories into this checkout and build them by name:
+`pmbootstrap install` produces an image without firmware. (It does depend on the
+redistributable `firmware-qcom-adreno-a530` from upstream, which supplies the
+A530 PM4/PFP command processor firmware the GPU needs; the A540 GPMU and the
+signed ZAP shader firmware still come from `firmware-lge-joan`.) To include
+them, copy the package directories into this checkout and build them by name:
 
 ```sh
 git clone https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages
@@ -91,8 +94,10 @@ then add them to `deviceinfo`'s package list or install them on the device with
 `apk add`.
 
 The firmware is proprietary and is **not redistributed here**. `firmware-lge-joan`
-fetches it at build time from commit-pinned
-[TheMuppets](https://github.com/TheMuppets) vendor trees. Two GPU variants are
+fetches the remotely available files at build time from commit-pinned
+[TheMuppets](https://github.com/TheMuppets) vendor trees; the modem/ADSP/IPA/WLAN
+set comes from an owner-extracted, hash-verified tarball that each builder
+prepares from their own device, following that repo's README. Two GPU variants are
 carried: `H932` for that exact model, and `H930` for every other joan including
 `H932PR`. Override with `pmos.joan_firmware_variant=h930|h932` on the kernel
 command line.
