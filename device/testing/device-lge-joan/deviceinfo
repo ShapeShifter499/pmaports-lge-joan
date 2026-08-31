@@ -10,9 +10,10 @@ deviceinfo_arch="aarch64"
 
 # Device related
 deviceinfo_chassis="handset"
+deviceinfo_drm="true"
 deviceinfo_screen_width="1440"
 deviceinfo_screen_height="2880"
-deviceinfo_external_storage="true"
+deviceinfo_rootfs_image_sector_size="4096"
 
 # Bootloader related
 deviceinfo_flash_method="fastboot"
@@ -25,6 +26,6 @@ deviceinfo_flash_offset_tags="0x00000100"
 deviceinfo_flash_pagesize="4096"
 
 # Mainline kernel options
-deviceinfo_kernel_cmdline="panic=5 ignore_loglevel pmos.force-partition-resize"
+deviceinfo_kernel_cmdline="panic=5 pmos.force-partition-resize"
 deviceinfo_dtb="qcom/msm8998-lge-joan"
 deviceinfo_append_dtb="true"
