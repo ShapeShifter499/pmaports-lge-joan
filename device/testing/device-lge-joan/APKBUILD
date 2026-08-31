@@ -3,15 +3,17 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan
 pkgdesc="LG V30"
 pkgver=1
-pkgrel=2
+pkgrel=3
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
 options="!check !archcheck"
 depends="
+	firmware-qcom-adreno-a530
 	linux-lge-joan
 	mkbootimg
 	postmarketos-base
+	soc-qcom
 "
 makedepends="devicepkg-dev"
 source="deviceinfo"
@@ -23,6 +25,7 @@ build() {
 package() {
 	devicepkg_package $startdir $pkgname
 }
+
 sha512sums="
-df7c34a56eb107139f3a9389ed57567d6a0953d6ce367b07171ae46fc615a706fe6769c07588e88307cf5120cc6cf0f61bf1b60506226586cd50c33fb028d101  deviceinfo
+b2be0ca80b220a2b4b58169531baaa4badc340eb92f9cd20b448efa064664ed5cdcd7e4b2ce6ec8d8c1d794cf874c83dbe0489dcd2b6f42af7ced2c48df738d2  deviceinfo
 "
