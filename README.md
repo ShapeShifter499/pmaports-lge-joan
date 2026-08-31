@@ -24,8 +24,25 @@ V30 with an unlocked bootloader.
 
 ```sh
 git clone https://github.com/ShapeShifter499/pmaports-lge-joan
+cd pmaports-lge-joan
+git remote add upstream https://gitlab.postmarketos.org/postmarketOS/pmaports.git
+cd ..
 pmbootstrap -p "$PWD/pmaports-lge-joan" init
 ```
+
+The `git remote add` is required, not optional. pmbootstrap identifies a
+pmaports checkout by looking for a remote whose **URL** is upstream pmaports;
+a plain clone of this fork only has the GitHub URL, so `init` fails with:
+
+```
+ERROR: pmaports: could not find remote name for any URL
+'['https://gitlab.postmarketos.org/postmarketOS/pmaports.git', ...]'
+in git repository: /path/to/pmaports-lge-joan
+```
+
+The remote's name does not matter and it never has to be fetched — only the
+URL is matched. If you already hit that error, add the remote to your existing
+clone and re-run `init`.
 
 Answer the device prompts with vendor `lge` and codename `joan`.
 
