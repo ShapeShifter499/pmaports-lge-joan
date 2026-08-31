@@ -6,8 +6,8 @@ maintainer="Lance <Gero3977@gmail.com>"
 _flavor="lge-joan"
 pkgname=linux-$_flavor
 pkgver=7.2.0_rc2
-pkgrel=2
-_commit="323451cb679aeba2c51dce2fb15a11410cb13631"
+pkgrel=3
+_commit="1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae"
 pkgdesc="Mainline kernel for the LG V30 (joan)"
 arch="aarch64"
 _carch="arm64"
@@ -37,16 +37,6 @@ makedepends="
 source="
 	$pkgname-$_commit.tar.gz::$url/archive/$_commit.tar.gz
 	$_config
-	0001-arm64-dts-qcom-msm8998-lge-joan-enable-the-Adreno-54.patch
-	0002-arm64-dts-qcom-msm8998-add-the-GPU-BIMC_GFX-source-c.patch
-	0003-drm-msm-fix-NULL-deref-when-SUBMIT-is-a-context-s-fi.patch
-	0004-drm-msm-adreno-keep-A540-active-across-runtime-PM.patch
-	0005-drm-msm-dsi-exclude-DCS-transfers-from-frame-kickoff.patch
-	0006-drm-panel-lg-sw43402-add-runtime-backlight-control.patch
-	0007-dt-bindings-display-msm-describe-A540-mem_src-clock.patch
-	0008-dt-bindings-display-msm-describe-GPU-supplies.patch
-	0009-drm-panel-lg-sw43402-restore-full-byte-brightness-ra.patch
-	0010-docs-clarify-A540-firmware-distribution-split.patch
 "
 builddir="$srcdir/linux-lg-v30-joan-$_commit"
 
@@ -77,16 +67,6 @@ package() {
 }
 
 sha512sums="
-623afd5f50028ea4a4676c75f24fa0cd25b4cdfe30a98e63fd73fa53e627f6b7b300e729ceb70fb39ac874e2f890c0a3d710b862388f58bc17121223b9d85d3f  linux-lge-joan-323451cb679aeba2c51dce2fb15a11410cb13631.tar.gz
-0379adb5c81f3f93e8a9064899faf073b1444cb06066ba239c4be86a83dbcacadb8f5966a3aa594ee092e98a63cdf1484aeb8862b1e0e99016c696270221483d  config-lge-joan.aarch64
-5ce773465027a72cce26063d3a5620777d0d3a7d55c80e8084ef67b5d0230b1b9f7a6d90e9bbe2ecf90f9d7ddef991ef1f6d7c7cfd9184d3938d55cc2e60d014  0001-arm64-dts-qcom-msm8998-lge-joan-enable-the-Adreno-54.patch
-01c740028d5f255ab9f49dcd0916863258ab32fe7204e1b72ff50994e3531e7bdce18c63443ca41a2b2aaf18f5127ad5ae7671a9cc086c6815e80e9f5f0edd48  0002-arm64-dts-qcom-msm8998-add-the-GPU-BIMC_GFX-source-c.patch
-170d25c9f81a821155ceb1b56cd4b88a900998192e0b5ba7f3033d04d1e2d8160d8465400a157e2b370790bda110152e07225d5a1980bbf09f5c98c68296c106  0003-drm-msm-fix-NULL-deref-when-SUBMIT-is-a-context-s-fi.patch
-6790c6fef24a2557ceef60a9b9453b2661ca1e912eb17286d876774b3999d9d024e64cbb3da9280f278343e1150ee0f15f5979e16d253858662e7d6c564ebc1e  0004-drm-msm-adreno-keep-A540-active-across-runtime-PM.patch
-fd06fc41a62153a4043b043419d463270d98f143e2e2c68142ef8f54866ee0b8f9e8beff76de00b27398118e7346e542476d42486385eb8f660cb54d6c19d65a  0005-drm-msm-dsi-exclude-DCS-transfers-from-frame-kickoff.patch
-14cf36b6e335ae3536fe926db73beb7b0a288a1dece3da76dad4d7742d491ff868e7fec7d30962a62e1793929329e035ac50323c188df964451c67c9016d80e8  0006-drm-panel-lg-sw43402-add-runtime-backlight-control.patch
-c2ae5bf8e49f434b3a1799dcfc32498be8867d04bd392d8a7c4d8eed9a06dc617c68c83eaeafbaf806688437a243a2840adce2a3f55cb2f10d1f4401987b779f  0007-dt-bindings-display-msm-describe-A540-mem_src-clock.patch
-a44084065522606097fd289c3ac104fc1c51176dd4dcce88b8bac8f85ac2b4091a58a812218bf313de0e13f64fb95bae695eab137ff603cb2e6e460b0e58e8ac  0008-dt-bindings-display-msm-describe-GPU-supplies.patch
-90e91352188058de20e0e647104e6ced24a5339c715d65ff82252e9f480945336efd1f036fef509e0857298b280614d0c631520baeb80ffc762e108f6ea77fc0  0009-drm-panel-lg-sw43402-restore-full-byte-brightness-ra.patch
-ed7b12aa9d55b9d7f66da5d71e3a26a2f276474de5722262de9d69215d050e7443b23226504b57947a8812c4356f8b5f0107bd5c652c984b71ecfba1d20950d5  0010-docs-clarify-A540-firmware-distribution-split.patch
+478886684c4436ee023005d0e2d90be9a47542ecce173d7e438bb761a7e3d9cb7cae52b02716733a55497d8d220fdf23a8a54bb3c9934dc260aaa68a76caac61  linux-lge-joan-1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae.tar.gz
+d6b1780cb1162e9f7400eed93bc1d7d75081f3da5759c5bfd8c050d12f7011940f67fe080b56776cb46c4ac07ffacdebd050a28b3988dc7f0813ccc3f84256e0  config-lge-joan.aarch64
 "
