@@ -1,0 +1,66 @@
+From a05339f96caaa32a47fc7d42324af8f9d39a97ad Mon Sep 17 00:00:00 2001
+From: Lance <Gero3977@gmail.com>
+Date: Sun, 2 Aug 2026 04:33:42 -0700
+Subject: [PATCH 07/10] dt-bindings: display: msm: describe A540 mem_src clock
+
+MSM8998 needs GCC_GPU_BIMC_GFX_SRC_CLK enabled with the other Adreno
+A540 clocks so GPU memory traffic can reach BIMC. The joan bring-up adds
+that clock as mem_src, while the existing binding still limits A540 to
+the six-clock set shared with A508/A509/A512.
+
+Split A540 into its own conditional and describe the seventh clock so
+the working hardware description also passes schema validation. Keep
+the six-clock contract unchanged for A508, A509 and A512.
+
+Signed-off-by: Lance <Gero3977@gmail.com>
+Assisted-by: Aurel/Hermes:openai-codex:gpt-5.6-sol
+---
+ .../devicetree/bindings/display/msm/gpu.yaml  | 28 ++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/display/msm/gpu.yaml b/Documentation/devicetree/bindings/display/msm/gpu.yaml
+index dbbd8b814..195cd82d2 100644
+--- a/Documentation/devicetree/bindings/display/msm/gpu.yaml
++++ b/Documentation/devicetree/bindings/display/msm/gpu.yaml
+@@ -276,7 +276,6 @@ allOf:
+               - pattern: '^qcom,adreno-508\.[0-9]+$'
+               - pattern: '^qcom,adreno-509\.[0-9]+$'
+               - pattern: '^qcom,adreno-512\.[0-9]+$'
+-              - pattern: '^qcom,adreno-540\.[0-9]+$'
+     then:
+       properties:
+         clocks:
+@@ -297,6 +296,33 @@ allOf:
+             - const: core
+               description: GPU Core clock
+ 
++  - if:
++      properties:
++        compatible:
++          contains:
++            pattern: '^qcom,adreno-540\.[0-9]+$'
++    then:
++      properties:
++        clocks:
++          minItems: 7
++          maxItems: 7
++        clock-names:
++          items:
++            - const: iface
++              description: GPU Interface clock
++            - const: rbbmtimer
++              description: GPU RBBM Timer for Adreno 5xx series
++            - const: mem
++              description: GPU Memory clock
++            - const: mem_iface
++              description: GPU Memory Interface clock
++            - const: mem_src
++              description: GPU Memory source clock
++            - const: rbcpr
++              description: GPU RB Core Power Reduction clock
++            - const: core
++              description: GPU Core clock
++
+   - if:
+       properties:
+         compatible:

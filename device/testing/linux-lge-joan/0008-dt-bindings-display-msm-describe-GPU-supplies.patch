@@ -1,0 +1,35 @@
+From 3886e860d607bc1c670601a40b25341c2e67f727 Mon Sep 17 00:00:00 2001
+From: Lance <Gero3977@gmail.com>
+Date: Sun, 2 Aug 2026 05:04:10 -0700
+Subject: [PATCH 08/10] dt-bindings: display: msm: describe GPU supplies
+
+The MSM GPU driver requests a vdd regulator and an optional vddcx regulator,
+but gpu.yaml does not currently permit either corresponding supply property.
+This causes schema validation to reject the PM8005 S1 supply required by the
+MSM8998 Adreno A540 node.
+
+Describe both driver-consumed supplies.
+
+Signed-off-by: Lance G. <Gero3977@gmail.com>
+Assisted-by: Aurel Nymvale / Hermes Agent:openai-codex:gpt-5.6-sol
+---
+ Documentation/devicetree/bindings/display/msm/gpu.yaml | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/display/msm/gpu.yaml b/Documentation/devicetree/bindings/display/msm/gpu.yaml
+index 195cd82d2..9ebe4f9d6 100644
+--- a/Documentation/devicetree/bindings/display/msm/gpu.yaml
++++ b/Documentation/devicetree/bindings/display/msm/gpu.yaml
+@@ -83,6 +83,12 @@ properties:
+     minItems: 1
+     maxItems: 64
+ 
++  vdd-supply:
++    description: GPU core power supply
++
++  vddcx-supply:
++    description: GPU core logic power supply
++
+   sram:
+     minItems: 1
+     maxItems: 4

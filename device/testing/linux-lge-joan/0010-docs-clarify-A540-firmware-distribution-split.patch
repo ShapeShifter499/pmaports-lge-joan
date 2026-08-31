@@ -1,0 +1,31 @@
+From fa041e2916441ca355ea4271821fa0c6ba571e81 Mon Sep 17 00:00:00 2001
+From: Lance <Gero3977@gmail.com>
+Date: Mon, 3 Aug 2026 08:53:36 -0700
+Subject: [PATCH 10/10] docs: clarify A540 firmware distribution split
+
+Document that Adreno 540 reuses redistributable A530 PM4/PFP firmware while its GPMU and signed LG ZAP payload remain device-specific owner inputs. This is a comment-only correction; no DT behavior changes.
+
+Assisted-by: Hermes-Agent:openai-codex/gpt-5.6-sol
+Signed-off-by: Lance <Gero3977@gmail.com>
+---
+ arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts b/arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts
+index 0027dbfe3..0dabcf9c7 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts
++++ b/arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts
+@@ -650,8 +650,11 @@ touchscreen@49 {
+  * not require any particular address -- an earlier comment claiming it was
+  * address-locked was wrong; the move is about LG's memory map, not the blob.
+  *
+- * Firmware (a540_zap.*, a540_gpmu.fw2, a530_pm4/pfp) is not redistributable
+- * and must be present in /lib/firmware/qcom on the rootfs.
++ * A540 reuses the redistributable A530 PM4/PFP command firmware supplied by
++ * linux-firmware. The A540 GPMU and signed LG ZAP payload remain
++ * owner-extracted, device-specific inputs. All four firmware roles must be
++ * available under qcom/ in the firmware search path (the initramfs for the
++ * early-probe images used here).
+  */
+ &gpu_mem {
+ 	reg = <0x0 0x95c00000 0x0 0x100000>;
