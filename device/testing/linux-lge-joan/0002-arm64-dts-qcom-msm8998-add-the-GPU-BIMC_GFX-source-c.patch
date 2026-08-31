@@ -1,0 +1,61 @@
+From ddfd2c224e06d57fca944a87bf07d26d9b278144 Mon Sep 17 00:00:00 2001
+From: Lance <Gero3977@gmail.com>
+Date: Mon, 27 Jul 2026 02:06:25 -0700
+Subject: [PATCH 2/6] arm64: dts: qcom: msm8998: add the GPU BIMC_GFX source
+ clock
+
+The Adreno 540 on msm8998 loses all access to memory a few seconds into
+every boot.  Any GPU access issued after that point stalls the VBIF
+forever: RBBM_STATUS reads C00003C1 (VBIF_BUSY with PFP and ME both
+idle), the CP never advances its read pointer, and no SMMU context fault
+is ever raised because the transaction never reaches the SMMU.  The GPU
+looks healthy at rest -- RBBM_STATUS 0x00000001, core clock at its
+target rate -- right up until it is asked to fetch anything.
+
+The cause is GCC_GPU_BIMC_GFX_SRC_CLK.  It gates the GPU's path to BIMC,
+and no driver claims it, so clk_disable_unused() switches it off at
+late_initcall.  That is why the failure is a function of elapsed time and
+not of what is submitted: ring work issued from a5xx_hw_init() at ~1.4 s
+executes normally, and the identical cmdstream issued from a delayed work
+at 4.5 s hangs.  Booting with clk_ignore_unused makes the later attempts
+succeed, and adding this one clock to the GPU node fixes it without that
+workaround.
+
+Measured on an LG V30 (US998), with a ring-direct indirect buffer writing
+a unique marker to CP_SCRATCH_REG(3) and reading it back, repeated every
+three seconds:
+
+  before: iter 0 at 4572 ms: HUNG scratch3=00000000
+  after:  iter 0 at 4572 ms: EXECUTED scratch3=01420006
+          iter 1 at 7644 ms: EXECUTED scratch3=01420007
+          ... 13+ consecutive passes, no faults
+
+With the clock in place a full Phosh session renders on freedreno
+(GL renderer: FD540) at 1440x2880, retiring 30-70 submits per second with
+no GPU fault, hangcheck or recovery.
+
+Signed-off-by: Lance <Gero3977@gmail.com>
+Assisted-by: Claude-Code:claude-opus-5
+---
+ arch/arm64/boot/dts/qcom/msm8998.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+index 347706011..6990198e6 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+@@ -1532,12 +1532,14 @@ adreno_gpu: gpu@5000000 {
+ 				<&gpucc RBBMTIMER_CLK>,
+ 				<&gcc GCC_BIMC_GFX_CLK>,
+ 				<&gcc GCC_GPU_BIMC_GFX_CLK>,
++				<&gcc GCC_GPU_BIMC_GFX_SRC_CLK>,
+ 				<&gpucc RBCPR_CLK>,
+ 				<&gpucc GFX3D_CLK>;
+ 			clock-names = "iface",
+ 				"rbbmtimer",
+ 				"mem",
+ 				"mem_iface",
++				"mem_src",
+ 				"rbcpr",
+ 				"core";
+ 

@@ -1,0 +1,47 @@
+From 17b267ea59d52bf430f5ec2273adbb490ce84945 Mon Sep 17 00:00:00 2001
+From: Lance <Gero3977@gmail.com>
+Date: Mon, 27 Jul 2026 02:06:35 -0700
+Subject: [PATCH 3/6] drm/msm: fix NULL deref when SUBMIT is a context's first
+ VM user
+
+msm_ioctl_gem_submit() reads to_msm_vm(ctx->vm)->unusable before anything
+has created the context's VM.  ctx->vm is allocated lazily by
+msm_context_vm(), which every other user goes through -- including
+submit_create() a little further down the same ioctl.  A GEM_SUBMIT
+issued before any ioctl that touches the VM therefore dereferences NULL.
+
+Mesa never hits this because it allocates buffers and asks for their
+iovas first, but it is reachable by any unprivileged process with a
+render node open, which makes it a local denial of service:
+
+  Unable to handle kernel NULL pointer dereference at virtual address 00000000000003c5
+  CPU: 3 UID: 10000 PID: 1929 Comm: msmsubmit
+  pc : msm_ioctl_gem_submit+0x60/0x1834
+  Call trace:
+   msm_ioctl_gem_submit+0x60/0x1834 (P)
+   drm_ioctl_kernel+0xc0/0x134
+   drm_ioctl+0x1fc/0x4c0
+   __arm64_sys_ioctl+0xa4/0x100
+
+Found while writing a bring-up prober that submitted before allocating.
+Route the check through msm_context_vm() like every other caller.
+
+Signed-off-by: Lance <Gero3977@gmail.com>
+Assisted-by: Claude-Code:claude-opus-5
+---
+ drivers/gpu/drm/msm/msm_gem_submit.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/msm/msm_gem_submit.c b/drivers/gpu/drm/msm/msm_gem_submit.c
+index 3c6bc90c3..6c62b993d 100644
+--- a/drivers/gpu/drm/msm/msm_gem_submit.c
++++ b/drivers/gpu/drm/msm/msm_gem_submit.c
+@@ -572,7 +572,7 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
+ 	if (args->pad)
+ 		return -EINVAL;
+ 
+-	if (to_msm_vm(ctx->vm)->unusable)
++	if (to_msm_vm(msm_context_vm(dev, ctx))->unusable)
+ 		return UERR(EPIPE, dev, "context is unusable");
+ 
+ 	/* for now, we just have 3d pipe.. eventually this would need to
