@@ -6,7 +6,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 _flavor="lge-joan"
 pkgname=linux-$_flavor
 pkgver=7.2.0_rc2
-pkgrel=3
+pkgrel=4
 _commit="1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae"
 pkgdesc="Mainline kernel for the LG V30 (joan)"
 arch="aarch64"
@@ -68,5 +68,5 @@ package() {
 
 sha512sums="
 478886684c4436ee023005d0e2d90be9a47542ecce173d7e438bb761a7e3d9cb7cae52b02716733a55497d8d220fdf23a8a54bb3c9934dc260aaa68a76caac61  linux-lge-joan-1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae.tar.gz
-d6b1780cb1162e9f7400eed93bc1d7d75081f3da5759c5bfd8c050d12f7011940f67fe080b56776cb46c4ac07ffacdebd050a28b3988dc7f0813ccc3f84256e0  config-lge-joan.aarch64
+ec5e9c9bfedaf04936a8284b940027b6638c7c41a85b6961d7fd21071dac798d4110074bf047a66ca0f80da7e7cb4ce8296c5bef40a3d1945a8c7a7f45cd1409  config-lge-joan.aarch64
 "
