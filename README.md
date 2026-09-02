@@ -58,7 +58,22 @@ The remote's name does not matter — only its URL is matched. `--depth 1` is
 enough; the full upstream history is not needed. If you have already hit
 either error, run both commands in your existing clone and re-run `init`.
 
-Answer the device prompts with vendor `lge` and codename `joan`.
+Answer the device prompts with vendor `lge`, and pick the codename that matches
+your handset:
+
+| codename | for |
+|---|---|
+| `joan` | H930, US998, H932PR and every other V30 |
+| `joan-h932` | an **exact LG-H932** (T-Mobile) |
+
+The H932 is signed with different keys, so it needs its own firmware: measured
+against stock images of the same Android release and the same Qualcomm build,
+38 of 47 firmware files differ. This is the same distinction LineageOS makes by
+detecting an H932 while flashing; here it is just a different device package,
+and the correct firmware follows automatically.
+
+`LG-H932PR` is **not** an H932 and uses `joan`. If you are unsure, check
+`androidboot.vendor.lge.model.name` in `/proc/cmdline` on the stock ROM.
 
 `-p/--aports` has to be repeated on every later `pmbootstrap` call. To avoid
 that, set it once instead:
