@@ -1,0 +1,41 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+set -eu
+
+cat >&2 <<'MSG'
+firmware-lge-joan-h930 installs the modem, ADSP, IPA, WLAN and GPU zap firmware
+for one signing family.
+
+  Correct for: H930, US998, H932PR and every other V30 except an exact LG-H932.
+  WRONG for:   an exact LG-H932.
+
+The H932 is the T-Mobile model and is signed with different keys: 38 of 47
+firmware files differ from every other joan, at the same Android release and
+the same Qualcomm build. Installing the wrong family damages nothing, but the
+images will not authenticate -- expect no cellular, no WLAN, and a GPU that
+never comes up.
+
+MSG
+
+if [ -r /proc/cmdline ]; then
+	model=$(tr ' ' '\n' < /proc/cmdline \
+		| sed -n 's/^androidboot\.vendor\.lge\.model\.name=//p' | head -1)
+	if [ -n "$model" ]; then
+		case "$model" in
+		LG-H932) want=h932 ;;
+		*) want=h930 ;;
+		esac
+		if [ "$want" != "h930" ]; then
+			echo "WARNING: this device reports $model, which needs" >&2
+			echo "         firmware-lge-joan-$want, not -h930." >&2
+			echo "         Install that instead:" >&2
+			echo "           apk add firmware-lge-joan-$want" >&2
+		else
+			echo "This device reports $model: correct package." >&2
+		fi
+	else
+		echo "Bootloader model not in /proc/cmdline; cannot confirm the choice." >&2
+	fi
+fi
+
+exit 0
