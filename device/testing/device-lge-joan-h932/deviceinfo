@@ -29,3 +29,11 @@ deviceinfo_flash_pagesize="4096"
 deviceinfo_kernel_cmdline="panic=5 pmos.force-partition-resize"
 deviceinfo_dtb="qcom/msm8998-lge-joan"
 deviceinfo_append_dtb="true"
+
+# USB gadget IDs — do NOT use the pmOS default 18d1:d001.
+# lsusb maps 18d1:d001 to "Nexus 4 (fastboot)", so a running pmOS gadget
+# looks identical to the bootloader. Linux Foundation gadget IDs match
+# usb-moded and stay off the fastboot number.
+deviceinfo_usb_idVendor="0x1d6b"
+deviceinfo_usb_idProduct="0x0104"
+deviceinfo_usb_serialnumber="lge-joan-h932"

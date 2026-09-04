@@ -10,16 +10,20 @@ mainline port. Upstream's own README follows below.
 | `device/testing/device-lge-joan-h932` | exact T-Mobile H932 only — depends on `firmware-lge-joan-h932` |
 | `device/testing/linux-lge-joan` | mainline kernel, pinned to a commit of [`ShapeShifter499/linux-lg-v30-joan`](https://github.com/ShapeShifter499/linux-lg-v30-joan) |
 | `device/testing/firmware-lge-joan` | text-only recipe: shared GPU/BT plus `-h930` / `-h932`. Fetches [`firmware-lge-joan-blobs`](https://github.com/ShapeShifter499/firmware-lge-joan-blobs) at a commit pin. **No owner tarball, no copy-in.** |
+| `device/testing/alsa-ucm-conf-lge-joan` | ALSA UCM so PipeWire sees the jack instead of dummy output |
+| `device/testing/joan-imsd` | 3GPP IMS SIP UA (VoLTE). OpenRC `joan-imsd`, CLI `joan-ims dial` |
+| `device/testing/lge-joan-volte` | first-boot metapackage: MM + 81voltd + rmtfs + calls + joan-imsd |
 
 Everything else in this tree is unmodified upstream pmaports. The GPU/display
 enablement lives in that kernel pin, not as a carried patch series here.
 
 ## Building for the LG V30
 
-This tree is self-contained for a first image. The kernel tarball and the
-firmware **recipe** are in-tree; proprietary blobs are fetched at build time
-from the commit pin in `firmware-lge-joan/APKBUILD`. There is **no**
-`owner-firmware-lge-joan.tar` to prepare and **no** extra clone/copy.
+This tree is self-contained for a first image. The kernel tarball, firmware
+**recipe**, ALSA UCM profile, and VoLTE stack are in-tree. Proprietary firmware
+blobs are fetched at build time from the commit pin in
+`firmware-lge-joan/APKBUILD`. There is **no** `owner-firmware-lge-joan.tar`
+to prepare and **no** extra clone/copy.
 
 You need pmbootstrap, roughly 25 GB of free space for the kernel build, and a
 V30 with an unlocked bootloader. The H932 has no usable `fastboot boot` /
@@ -101,10 +105,9 @@ sha512sum: can't open '.../owner-firmware-lge-joan.tar': No such file or directo
 ERROR: Couldn't build aarch64/firmware-lge-joan-*.apk
 ```
 
-Optional audio / VoLTE packages live in
-[`lg-v30-joan-pmos-packages`](https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages)
-and are **not** a device-package dependency. Copy those in only if you want
-them (`alsa-ucm-conf-lge-joan`, `joan-imsd`, `lge-joan-volte`).
+Optional extra-packages working copies still live in
+[`lg-v30-joan-pmos-packages`](https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages);
+they are already vendored here, so a first image does not copy them in.
 
 ### 2. Build the rootfs
 
@@ -139,19 +142,17 @@ Android/`dd` shell (or the laf slot). US998 still has usable fastboot.
 
 ## Packages that live in the other repo
 
-The firmware **recipe** is in this fork (`device/testing/firmware-lge-joan`).
-The proprietary blobs are **not** — they are fetched at build time from
+The firmware **recipe**, ALSA UCM, and VoLTE stack are in this fork. Proprietary
+blobs are **not** — they are fetched at build time from
 [`firmware-lge-joan-blobs`](https://github.com/ShapeShifter499/firmware-lge-joan-blobs).
-Audio and VoLTE still live in
-[`ShapeShifter499/lg-v30-joan-pmos-packages`](https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages):
+Working copies of the extra packages still live in
+[`ShapeShifter499/lg-v30-joan-pmos-packages`](https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages);
+a first `pmbootstrap install` does not copy them in.
 
-| package | why you want it |
-|---|---|
-| `alsa-ucm-conf-lge-joan` | without it PipeWire shows "dummy output" and no audio devices |
-| `joan-imsd`, `lge-joan-volte` | IMS/VoLTE — see that repo's `FIRST-INSTALL-VOLTE.md` |
-
-Copy those in only if you want them; a first `pmbootstrap install` already
-has GPU, Bluetooth, modem, ADSP, IPA, WLAN and zap.
+A first image already has GPU, Bluetooth, modem, ADSP, IPA, WLAN, zap, the
+joan UCM profile, and the VoLTE metapackage (`lge-joan-volte` → `joan-imsd`,
+ModemManager, 81voltd, rmtfs, Calls). First-boot IMS steps:
+`device/testing/lge-joan-volte/FIRST-INSTALL-VOLTE.md`.
 
 ## Caveats
 
@@ -161,10 +162,8 @@ Read these before filing a bug.
   CI or review.
 * The kernel is **pinned to one commit**, not tracking that repo's `master`.
   You get exactly that snapshot.
-* `deviceinfo` sets no USB gadget IDs, so the pmOS default `18d1:d001` applies —
-  `lsusb` reports that as "Nexus 4 (fastboot)", meaning a booted pmOS gadget
-  looks identical to the bootloader. The other repo ships a
-  `deviceinfo-usb.snippet` with Linux Foundation IDs you can paste in.
+* `deviceinfo` sets Linux Foundation USB gadget IDs (`1d6b:0104`) so a booted
+  pmOS gadget is not `lsusb`'s "Nexus 4 (fastboot)" (`18d1:d001`).
 * VoLTE is a work in progress. It has been carried through a live call on one
   network; other carriers and USIM-based SIMs need more testing and logs.
 * Hardware support is moving. For what actually works today, check

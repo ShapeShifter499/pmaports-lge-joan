@@ -1,0 +1,8 @@
+# USB gadget IDs — do NOT use the pmOS default 18d1:d001.
+# lsusb maps 18d1:d001 to "Nexus 4 (fastboot)", so a running pmOS gadget
+# looks identical to the bootloader. Other pmOS devices set these in
+# deviceinfo (Google phones: 18d1:4ee3). Joan uses Linux Foundation
+# gadget IDs to match usb-moded and stay off the fastboot number.
+deviceinfo_usb_idVendor="0x1d6b"
+deviceinfo_usb_idProduct="0x0104"
+deviceinfo_usb_serialnumber="lge-joan"

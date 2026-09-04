@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=VoLTE Call
+Comment=Place a 4G IMS call (joan)
+Exec=kgx -e joan-ims dial
+Terminal=false
+Type=Application
+Categories=Telephony;Network;
+Icon=phone

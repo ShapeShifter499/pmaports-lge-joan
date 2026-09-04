@@ -3,16 +3,18 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan-h932
 pkgdesc="LG V30, T-Mobile H932 only (differently signed firmware)"
 pkgver=1
-pkgrel=1
+pkgrel=2
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
 options="!check !archcheck"
 depends="
+	alsa-ucm-conf-lge-joan
 	firmware-lge-joan
 	firmware-lge-joan-h932
 	firmware-lge-joan-initramfs
 	firmware-qcom-adreno-a530
+	lge-joan-volte
 	linux-lge-joan
 	mkbootimg
 	postmarketos-base
@@ -30,5 +32,5 @@ package() {
 }
 
 sha512sums="
-c2f4affa48eea023a150c743c892befa7c90604f0f975d4b3ae2ac1a6fa25ffaa1377101265b61b6ce4e4481f4d180969bde82a2fce34f0e289f75277eab5288  deviceinfo
+8a77160fc5ef5335e128557dc967145b45861d7d19a4ee99293dd152ac00d7944e68444033ccd60e9e35ee5e3fe2e9ac325d963fb1f99a6a8fb5f698308eac7e  deviceinfo
 "

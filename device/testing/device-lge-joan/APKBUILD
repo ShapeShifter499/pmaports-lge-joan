@@ -3,16 +3,18 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=5
+pkgrel=6
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
 options="!check !archcheck"
 depends="
+	alsa-ucm-conf-lge-joan
 	firmware-lge-joan
 	firmware-lge-joan-h930
 	firmware-lge-joan-initramfs
 	firmware-qcom-adreno-a530
+	lge-joan-volte
 	linux-lge-joan
 	mkbootimg
 	postmarketos-base
@@ -30,5 +32,5 @@ package() {
 }
 
 sha512sums="
-b2be0ca80b220a2b4b58169531baaa4badc340eb92f9cd20b448efa064664ed5cdcd7e4b2ce6ec8d8c1d794cf874c83dbe0489dcd2b6f42af7ced2c48df738d2  deviceinfo
+702d64e6107c5c9f9e17eac5a590f22387503747f10e361c107750b4a0f0c2ba89c3fddaf7f66a261cf960c67aa98669330cb42785c8a61b77206d438ed79a98  deviceinfo
 "

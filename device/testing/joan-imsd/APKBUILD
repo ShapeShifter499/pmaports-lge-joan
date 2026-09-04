@@ -1,0 +1,57 @@
+# Maintainer: Lance <Gero3977@gmail.com>
+maintainer="Lance <Gero3977@gmail.com>"
+pkgname=joan-imsd
+pkgver=0.1
+pkgrel=0
+pkgdesc="3GPP IMS SIP UA for LG V30 (joan) VoLTE — AP-side, no vendor blobs"
+url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
+arch="noarch"
+license="MIT"
+depends="python3 qmi-utils modemmanager 81voltd"
+subpackages="$pkgname-openrc"
+options="!check"
+source="
+	joan-ims
+	joan-imsd.initd
+	joan-ims.desktop
+	joan_ims_live.py
+	joan_ims_esp.py
+	joan_ims_ipsec.py
+	joan_ims_pco.py
+	joan_ims_register.py
+	joan_ims_ua.py
+	tmo-us.yaml
+	"
+
+package() {
+	install -Dm755 "$srcdir/joan-ims" "$pkgdir/usr/bin/joan-ims"
+	install -Dm644 "$srcdir/joan-ims.desktop" \
+		"$pkgdir/usr/share/applications/joan-ims.desktop"
+	install -d "$pkgdir/usr/lib/joan-imsd" \
+		"$pkgdir/usr/share/joan-imsd/profiles" \
+		"$pkgdir/etc/joan-imsd" \
+		"$pkgdir/var/lib/joan-imsd"
+	for f in joan_ims_live.py joan_ims_esp.py joan_ims_ipsec.py \
+		joan_ims_pco.py joan_ims_register.py joan_ims_ua.py; do
+		install -Dm644 "$srcdir/$f" "$pkgdir/usr/lib/joan-imsd/$f"
+	done
+	install -Dm644 "$srcdir/tmo-us.yaml" \
+		"$pkgdir/usr/share/joan-imsd/profiles/tmo-us.yaml"
+}
+
+openrc() {
+	install -Dm755 "$srcdir/joan-imsd.initd" "$subpkgdir/etc/init.d/joan-imsd"
+}
+
+sha512sums="
+be3ef7043a777d1b58283a957effabb951d6059f04f6dde1ef397b94856ee03fbdad42a78621aa3c46f2f38859a42ca3a28c31ae87cdb69d433eb665ac200005  joan-ims
+c3eef9cd3224d58815dc3f7372f93caddebb554857d8c8841f09bb5d777e127acf91c9f6570e39c17a8a05aad5ec666a16fe5c6e69fd5871926ee44bc7e62162  joan-imsd.initd
+406962def62a9f5a16f23d475d1b926ebd0ca7a61b5e6dfe5e3f9aee355d8070e15fbe034217969bedd4b8a5ff49e53bd61e7e1e9348083dbe4baedfbe4f2073  joan-ims.desktop
+a596d0037c20860087d5fd09c78dccf7b0c8b6e80ce8681b05d6abe1839988ad6f215582260075597ff374cf1fffc6f65af2f655b772d40ca9979cf9417d2472  joan_ims_live.py
+33a6b74d7f2b9177336c6b5cbcab3a26c248370ee9e569748a8d7fddfe6512de795cc0599c791823b87990345b0b489f624533b2fffed205397e168848959c99  joan_ims_esp.py
+1c1864cf14db6782c5e749314088808d6fe56244474012c3759bfa374ec8475cb2072aa36a8d52e57d60da60090cfbeb3a76c83dcd3977a031b7ee37497672e1  joan_ims_ipsec.py
+c1ef1002b8a5d896d6036e7d29b853be5b72cf740bab3bcdda8b250d4a408c9e04ff4aba3ea032ab6cb205129e5befcb219f611539304c547cc70f78c06aca2b  joan_ims_pco.py
+8028d782ca4abee093127631b16df586e8576a7cff60cdfe049771b19c6db502d3ef0e34a8083db296fcfe4b4322a651bf14a850305e41908e4110c9dd4bc77d  joan_ims_register.py
+95c1c7393f6603c41f79b5493a6282e899233eeb5460f79ab0ceefaede9367e321baff58442944cb28287b9478a3754d6eb82109c8573e063e31600897bad2e9  joan_ims_ua.py
+992bf1c72e72f1ff89ef41caf8e1db29dda577bc7d77b1a81eb5318d87462b7c0279942343704c5fb7b86cf5e0ca2b1aa0f1a7dd64c1bd69d64b37b8a15a59b1  tmo-us.yaml
+"

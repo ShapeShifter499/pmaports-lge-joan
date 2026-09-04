@@ -1,0 +1,17 @@
+#!/sbin/openrc-run
+# IMS AP SIP UA for LG V30 (joan). 3GPP REGISTER; carrier profile overlay.
+name="joan-imsd"
+description="LG V30 IMS registration (VoLTE SIP UA)"
+
+command="/usr/bin/joan-ims"
+command_args="register"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+output_log="/var/log/joan-imsd.log"
+error_log="/var/log/joan-imsd.log"
+command_env="PYTHONUNBUFFERED=1 PYTHONPATH=/usr/lib/joan-imsd"
+
+depend() {
+	need modemmanager
+	after 81voltd
+}
