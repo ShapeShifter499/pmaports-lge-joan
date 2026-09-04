@@ -1,0 +1,16 @@
+# Historical TheMuppets pins for the GPU/BT files that now live in
+# firmware-lge-joan-blobs (common/ + zap inside h930/ and h932/).
+# The APKBUILD no longer fetches these URLs; it installs from the blobs
+# archive. Kept so the original provenance is still readable.
+# filename	variant	size	sha256	url
+common-a540_gpmu.fw2	common	11736	57d7653c4dcc1130ac2c31512ec7fbb6348613d4bcd99b9b6221e3f9ee52f535	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan-common/274a1e49a783b971eb967f6afd303b3ec38c9a1b/proprietary/vendor/firmware/a540_gpmu.fw2
+crbtfw21.tlv	common	149428	8d587968cd90fb2c4bf94cd06921e9979015172b49ac3a8741947dd37675f2c5	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan-common/274a1e49a783b971eb967f6afd303b3ec38c9a1b/proprietary/vendor/firmware/crbtfw21.tlv
+crnv21.bin	common	4480	43f429abcf72c6a0e93e6de2875a174369dc83002ab539826c40da30677337e9	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan-common/274a1e49a783b971eb967f6afd303b3ec38c9a1b/proprietary/vendor/firmware/crnv21.bin
+H930-a540_zap.mdt	H930	6684	cc51c6cec73c932c99ec82327c14f2eaa0308ced70e1e65573e0494b9ecc89bb	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan/2489e95801110695e991394245b6d7ae66670c4e/proprietary/vendor/firmware/H930/a540_zap.mdt
+H930-a540_zap.b00	H930	148	5302ecf8978c825bdc9d8455a828a4ac1e1d762cf09ff821f9f506fb89a549e5	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan/2489e95801110695e991394245b6d7ae66670c4e/proprietary/vendor/firmware/H930/a540_zap.b00
+H930-a540_zap.b01	H930	6536	f0fe5a12c1062d99c8a7d8cdf05bcf7cb8d4573c07b47ceb0f66f9cacdca28f8	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan/2489e95801110695e991394245b6d7ae66670c4e/proprietary/vendor/firmware/H930/a540_zap.b01
+H930-a540_zap.b02	H930	4916	997933766e93f7692329f397808f8c23128a58b565d6305e48608cfce711e5d7	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan/2489e95801110695e991394245b6d7ae66670c4e/proprietary/vendor/firmware/H930/a540_zap.b02
+H932-a540_zap.mdt	H932	6684	d33e37f06d6123d57841cb00df78a840fb09ad32fb529e8567a4e353e7894427	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan/2489e95801110695e991394245b6d7ae66670c4e/proprietary/vendor/firmware/H932/a540_zap.mdt
+H932-a540_zap.b00	H932	148	5302ecf8978c825bdc9d8455a828a4ac1e1d762cf09ff821f9f506fb89a549e5	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan/2489e95801110695e991394245b6d7ae66670c4e/proprietary/vendor/firmware/H932/a540_zap.b00
+H932-a540_zap.b01	H932	6536	553481af129d4996f50984e501dfb00ec6a512c5ea924316112bdb3ee088a8cb	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan/2489e95801110695e991394245b6d7ae66670c4e/proprietary/vendor/firmware/H932/a540_zap.b01
+H932-a540_zap.b02	H932	4916	997933766e93f7692329f397808f8c23128a58b565d6305e48608cfce711e5d7	https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_lge_joan/2489e95801110695e991394245b6d7ae66670c4e/proprietary/vendor/firmware/H932/a540_zap.b02

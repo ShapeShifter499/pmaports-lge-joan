@@ -1,0 +1,111 @@
+# Maintainer: Lance <Gero3977@gmail.com>
+maintainer="Lance <Gero3977@gmail.com>"
+pkgname=firmware-lge-joan
+pkgver=1.0
+pkgrel=8
+pkgdesc="Firmware for the LG V30 (joan)"
+url="https://github.com/ShapeShifter499/firmware-lge-joan-blobs"
+arch="aarch64"
+license="custom"
+subpackages="
+	$pkgname-h930:h930
+	$pkgname-h932:h932
+	$pkgname-initramfs:firmware_initramfs:noarch
+	"
+options="!check !strip !archcheck !spdx !tracedeps pmb:cross-native"
+
+# Everything is mirrored into one repository and pinned by commit, so a build
+# depends on no third party staying up.  The redistributable GPU and Bluetooth
+# files originate from commit-pinned TheMuppets vendor trees; the modem, ADSP,
+# IPA, WLAN and zap payloads come off retail devices.
+_commit="f79f6166ff0377f432437c294f3d37b7b97162f3"
+_blobs="$srcdir/firmware-lge-joan-blobs-$_commit"
+_fwdir="/usr/lib/firmware"
+
+source="
+	firmware-lge-joan-blobs-$_commit.tar.gz::$url/archive/$_commit.tar.gz
+	joan-firmware-variant
+	30-lge-joan-gpu.files
+	"
+
+# Copy one tree from the mirror, verifying every file against the manifest as
+# it goes.  The archive sum covers the download; this covers the contents and
+# survives the archive being regenerated.
+_install_tree() {
+	local _tree="$1" _dest="$2"
+	local _t _path _size _sha _actual _seen=0 _bad=0 _missing=0
+
+	while IFS="$(printf '\t')" read -r _t _path _size _sha || [ -n "$_t" ]; do
+		case "$_t" in \#*|"") continue ;; esac
+		[ "$_t" = "$_tree" ] || continue
+
+		if ! [ -f "$_blobs/$_tree/$_path" ]; then
+			error "missing from $_tree: $_path"
+			_missing=$((_missing + 1))
+			continue
+		fi
+		_actual=$(sha256sum "$_blobs/$_tree/$_path" | cut -d' ' -f1)
+		if [ "$_actual" != "$_sha" ]; then
+			error "sha256 mismatch in $_tree: $_path"
+			_bad=$((_bad + 1))
+			continue
+		fi
+		install -Dm644 "$_blobs/$_tree/$_path" "$_dest/$_path"
+		_seen=$((_seen + 1))
+	done < "$_blobs/MANIFEST.tsv"
+
+	if [ "$_missing" -ne 0 ] || [ "$_bad" -ne 0 ] || [ "$_seen" -eq 0 ]; then
+		error "$_tree failed verification: $_seen ok, $_missing missing, $_bad mismatched"
+		return 1
+	fi
+	msg "$_tree: verified and installed $_seen files"
+}
+
+package() {
+	# Firmware every joan shares, plus the licence and the diagnostic.
+	_install_tree common "$pkgdir$_fwdir"
+
+	install -Dm644 "$_blobs/LICENSE.qcom" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+	install -Dm644 "$_blobs/NOTICE.txt" "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
+	install -Dm755 "$srcdir/joan-firmware-variant" "$pkgdir/usr/bin/joan-firmware-variant"
+}
+
+# The H932 is the T-Mobile model and is signed with different keys.  Against
+# stock firmware of the same Android release and the same Qualcomm build, 38 of
+# 47 files differ.  Exactly one of these may be installed; there is no default,
+# because guessing wrong means handing a device firmware signed for another
+# model.  LineageOS makes the same distinction by detecting an H932 at flash
+# time.
+h930() {
+	pkgdesc="LG V30 firmware (H930, US998, H932PR and every other joan)"
+	depends="firmware-qcom-adreno-a530 linux-firmware-ath10k !$pkgname-h932"
+	provides="$pkgname-variant=$pkgver-r$pkgrel"
+	install="$subpkgname.post-install"
+
+	_install_tree h930 "$subpkgdir$_fwdir"
+	ln -s qcom/msm8998/joan/wlanmdsp.mbn "$subpkgdir$_fwdir/wlanmdsp.mbn"
+}
+
+h932() {
+	pkgdesc="LG V30 firmware (exact LG-H932 only, differently signed)"
+	depends="firmware-qcom-adreno-a530 linux-firmware-ath10k !$pkgname-h930"
+	provides="$pkgname-variant=$pkgver-r$pkgrel"
+	install="$subpkgname.post-install"
+
+	_install_tree h932 "$subpkgdir$_fwdir"
+	ln -s qcom/msm8998/joan/wlanmdsp.mbn "$subpkgdir$_fwdir/wlanmdsp.mbn"
+}
+
+firmware_initramfs() {
+	pkgdesc="Early GPU and Bluetooth firmware list for the LG V30 initramfs"
+	depends="$pkgname=$pkgver-r$pkgrel $pkgname-variant"
+
+	install -Dm644 "$srcdir/30-lge-joan-gpu.files" \
+		"$subpkgdir/usr/share/mkinitfs/files/30-lge-joan-gpu.files"
+}
+
+sha512sums="
+ab50defb933f84170b9d8551e4fc1221c9424cf53a43b43e35b7db3051fa26cb77ad02946a0268adbbecdfd287b6c86babb065c86a9f340fb2a3e020a0c0bc85  firmware-lge-joan-blobs-f79f6166ff0377f432437c294f3d37b7b97162f3.tar.gz
+5b3c15d8a1db1b72cdfbdb2c93ba880966c9a9c9cc81723e8df66b675dba3b14b666aa92de9ccc8594c1d1905165dfa86b1e7c299b0d0e87046b04786593355a  joan-firmware-variant
+765b47972bce74922789db9bd913973e5b393b0dc3054ac63645e521700504cfe67398051c5e2d3323009a641b8fbb400c6ff1d1f7766a4e7ed3d34172644e6b  30-lge-joan-gpu.files
+"
