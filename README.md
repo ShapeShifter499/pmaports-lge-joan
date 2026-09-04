@@ -6,19 +6,24 @@ mainline port. Upstream's own README follows below.
 
 | package | what it is |
 |---|---|
-| `device/testing/device-lge-joan` | device package and `deviceinfo` — fastboot, `qcom/msm8998-lge-joan` |
-| `device/testing/linux-lge-joan` | mainline kernel, pinned to a commit of [`ShapeShifter499/linux-lg-v30-joan`](https://github.com/ShapeShifter499/linux-lg-v30-joan), with the joan GPU/display enablement series carried as patches |
+| `device/testing/device-lge-joan` | H930, US998, H932PR and every other non-H932 — depends on `firmware-lge-joan-h930` |
+| `device/testing/device-lge-joan-h932` | exact T-Mobile H932 only — depends on `firmware-lge-joan-h932` |
+| `device/testing/linux-lge-joan` | mainline kernel, pinned to a commit of [`ShapeShifter499/linux-lg-v30-joan`](https://github.com/ShapeShifter499/linux-lg-v30-joan) |
 
-Everything else in this tree is unmodified upstream pmaports.
+Everything else in this tree is unmodified upstream pmaports. The GPU/display
+enablement lives in that kernel pin, not as a carried patch series here.
 
 ## Building for the LG V30
 
-This tree is self-contained. Every source is public and commit-pinned, and
-nothing points at a local path, so a clone builds on any machine that can run
-[pmbootstrap](https://wiki.postmarketos.org/wiki/Pmbootstrap).
+This tree is not quite self-contained. The kernel tarball is public and
+commit-pinned, but the proprietary firmware recipe lives in
+[`lg-v30-joan-pmos-packages`](https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages)
+and must be copied in (step 2) or `pmbootstrap install` will fail looking for
+`firmware-lge-joan`. There is **no** `owner-firmware-lge-joan.tar` to prepare.
 
 You need pmbootstrap, roughly 25 GB of free space for the kernel build, and a
-V30 with an unlocked bootloader.
+V30 with an unlocked bootloader. The H932 has no usable `fastboot boot` /
+`fastboot flash`; see Caveats.
 
 ### 1. Point pmbootstrap at this fork
 
@@ -84,7 +89,40 @@ pmbootstrap config aports "$PWD/pmaports-lge-joan"
 
 It is stored in `~/.config/pmbootstrap_v3.cfg`.
 
-### 2. Build the rootfs
+### 2. Copy the firmware recipe in
+
+The device packages depend on `firmware-lge-joan` plus exactly one signing
+family. That recipe is not in this fork (the binaries are proprietary). Copy
+it from the packages repo **before** `pmbootstrap install`, or the build dies
+looking for a missing aport — or, with a stale recipe, looking for
+`owner-firmware-lge-joan.tar`.
+
+```sh
+git clone https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages
+cp -r lg-v30-joan-pmos-packages/firmware-lge-joan \
+      lg-v30-joan-pmos-packages/alsa-ucm-conf-lge-joan \
+      pmaports-lge-joan/device/testing/
+```
+
+Use **this** `firmware-lge-joan` directory. Do **not** copy
+`ShapeShifter499/firmware-lge-joan` — that is the retired owner-tarball
+recipe and is the source of:
+
+```
+sha512sum: can't open '.../owner-firmware-lge-joan.tar': No such file or directory
+ERROR: Couldn't build aarch64/firmware-lge-joan-*.apk
+```
+
+The current recipe fetches
+[`firmware-lge-joan-blobs`](https://github.com/ShapeShifter499/firmware-lge-joan-blobs)
+at a commit pin. `joan` pulls `-h930`; `joan-h932` pulls `-h932`. Do not
+install both.
+
+Optional audio / VoLTE packages from the same repo can be copied the same way.
+`alsa-ucm-conf-lge-joan` is not a device-package dependency; add it with
+`apk add` if you want PipeWire to see the jack.
+
+### 3. Build the rootfs
 
 ```sh
 pmbootstrap install
@@ -93,7 +131,7 @@ pmbootstrap install
 This builds `linux-lge-joan` from the pinned kernel tarball, which is the long
 part of the run.
 
-### 3. Flash
+### 4. Flash
 
 `deviceinfo` selects `fastboot`, and the kernel is packed into a boot image
 with the device tree appended.
@@ -109,6 +147,12 @@ To try a kernel without writing to the boot partition:
 pmbootstrap flasher boot
 ```
 
+On an **H932**, `fastboot boot` and `fastboot flash` both return
+`unknown command`. Do not use `pmbootstrap install --android-recovery-zip` —
+that installer repartitions `system` and destroys a LineageOS install. The
+working H932 path is a microSD rootfs plus writing `boot.img` from a rooted
+Android/`dd` shell (or the laf slot). US998 still has usable fastboot.
+
 ## Packages that live in the other repo
 
 Firmware, the ALSA UCM profile, and the VoLTE stack are **not** in this fork.
@@ -117,36 +161,15 @@ They are in
 
 | package | why you want it |
 |---|---|
-| `firmware-lge-joan` | GPU, Bluetooth, modem, ADSP, IPA and WLAN firmware |
+| `firmware-lge-joan` + `-h930` or `-h932` | GPU, Bluetooth, modem, ADSP, IPA, WLAN, zap. Copied in at step 2. |
 | `alsa-ucm-conf-lge-joan` | without it PipeWire shows "dummy output" and no audio devices |
 | `joan-imsd`, `lge-joan-volte` | IMS/VoLTE — see that repo's `FIRST-INSTALL-VOLTE.md` |
 
-`device-lge-joan` on this branch does **not** depend on any of them, so a plain
-`pmbootstrap install` produces an image without firmware. (It does depend on the
-redistributable `firmware-qcom-adreno-a530` from upstream, which supplies the
-A530 PM4/PFP command processor firmware the GPU needs; the A540 GPMU and the
-signed ZAP shader firmware still come from `firmware-lge-joan`.) To include
-them, copy the package directories into this checkout and build them by name:
-
-```sh
-git clone https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages
-cp -r lg-v30-joan-pmos-packages/firmware-lge-joan \
-      lg-v30-joan-pmos-packages/alsa-ucm-conf-lge-joan \
-      pmaports-lge-joan/device/testing/
-pmbootstrap build firmware-lge-joan alsa-ucm-conf-lge-joan
-```
-
-then add them to `deviceinfo`'s package list or install them on the device with
-`apk add`.
-
-The firmware is proprietary and is **not redistributed here**. `firmware-lge-joan`
-fetches the remotely available files at build time from commit-pinned
-[TheMuppets](https://github.com/TheMuppets) vendor trees; the modem/ADSP/IPA/WLAN
-set comes from an owner-extracted, hash-verified tarball that each builder
-prepares from their own device, following that repo's README. Two GPU variants are
-carried: `H932` for that exact model, and `H930` for every other joan including
-`H932PR`. Override with `pmos.joan_firmware_variant=h930|h932` on the kernel
-command line.
+The firmware is proprietary and is **not redistributed in this git tree**.
+`firmware-lge-joan` fetches a commit-pinned archive from
+[`firmware-lge-joan-blobs`](https://github.com/ShapeShifter499/firmware-lge-joan-blobs)
+at build time. There is no owner-extracted tarball and no TheMuppets fetch
+from the APKBUILD (those files are already mirrored).
 
 ## Caveats
 
