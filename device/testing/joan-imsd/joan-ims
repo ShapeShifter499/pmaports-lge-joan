@@ -1,0 +1,4 @@
+#!/bin/sh
+export PYTHONUNBUFFERED=1
+export PYTHONPATH="${PYTHONPATH:-/usr/lib/joan-imsd}"
+exec python3 -u /usr/lib/joan-imsd/joan_ims_live.py "$@"

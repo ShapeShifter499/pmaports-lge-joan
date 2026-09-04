@@ -1,0 +1,22 @@
+# Maintainer: Lance <Gero3977@gmail.com>
+maintainer="Lance <Gero3977@gmail.com>"
+pkgname=lge-joan-volte
+pkgver=0.1
+pkgrel=0
+pkgdesc="LG V30 (joan) first-boot VoLTE stack: MM, 81voltd, Calls, IMS UA"
+url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
+arch="noarch"
+license="MIT"
+depends="
+	81voltd
+	calls
+	callaudiod
+	joan-imsd
+	modemmanager
+	rmtfs
+	"
+options="!check"
+
+package() {
+	mkdir -p "$pkgdir"
+}

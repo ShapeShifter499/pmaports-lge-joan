@@ -1,0 +1,22 @@
+# T-Mobile US (PLMN 310260) — first live joan IMS profile.
+# Core UA is 3GPP TS 24.229; this file is overlay only.
+name: tmo-us
+plmn: "310260"
+ims_apn: ims
+ip_type: ipv6
+# P-CSCF: WDS Get Current Settings TLV 0x2e (PCO). ISIM list is empty.
+pcscf: pco
+aka: AKAv1-MD5
+# Ericsson SBC: From/To must be IMPU; Authorization username is IMPI.
+from_identity: impu
+auth_username: impi
+ipsec:
+  required: true
+  proto: esp
+  mode: trans
+  ealg: aes-cbc
+  aalg: hmac-sha-1-96
+sdp:
+  # GV 200 OK used PCMU+telephone-event. TMO offer still includes AMR.
+  payload_types: [PCMU, AMR-WB, AMR, telephone-event]
+expires: 600000
