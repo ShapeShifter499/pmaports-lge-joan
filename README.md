@@ -167,10 +167,11 @@ Non-destructive to the phone: the only internal partition touched is `laf`
 (LG's download-mode slot), so your current ROM, its data, and recovery stay
 intact. pmOS boots when you trigger download mode — power off, hold
 **Volume Up**, plug in USB; the same button command works on both variants
-and needs no adb or fastboot. Normal power-on still boots your regular ROM,
-and reflashing the stock `laf` image restores download mode. Recovery
-flashable zips that do the laf + card steps automatically ship for both
-variants (see below).
+and needs no adb or fastboot. Normal power-on still boots your regular ROM.
+Recovery flashable zips that do the laf + card steps automatically ship for
+both variants (see below). ⚠️ `laf` **is** LG Download Mode: back up `laf`
+and `lafbak` before flashing it and keep a way to restore them — download
+mode is your recovery door if anything else breaks.
 
 Requirements: a way to write `laf`, and an SD card you can afford to lose —
 **the card is overwritten completely (back it up first)**; pmOS repartitions
