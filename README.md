@@ -160,6 +160,12 @@ hosted elsewhere and linked from the release notes. Every release carries
 
 ### SD card install
 
+Non-destructive to the phone: the only internal partition touched is `laf`
+(LG's download-mode slot), so your current ROM, its data, and recovery stay
+intact. pmOS boots when you trigger download mode (power off, hold vol-up,
+plug in USB); normal power-on still boots your regular ROM, and reflashing
+the stock `laf` image restores download mode.
+
 Requirements: a **wiped** SD card (its contents are destroyed) and a way to
 write `laf`.
 
