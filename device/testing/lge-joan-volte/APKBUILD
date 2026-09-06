@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=lge-joan-volte
 pkgver=0.1
-pkgrel=1
+pkgrel=2
 pkgdesc="LG V30 (joan) first-boot VoLTE stack: MM, 81voltd, Calls, IMS UA"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -17,8 +17,6 @@ depends="
 	rmtfs
 	"
 source="
-	rmtfs.service
-	81voltd.service
 	80-device-lge-joan.preset
 	"
 options="!check"
@@ -30,17 +28,12 @@ package() {
 systemd_units() {
 	pkgdesc="systemd units and preset for the joan modem and IMS stack"
 	install_if="$pkgname=$pkgver-r$pkgrel systemd"
+	depends="81voltd-systemd rmtfs-systemd"
 
-	install -Dm644 "$srcdir/rmtfs.service" \
-		"$subpkgdir/usr/lib/systemd/system/rmtfs.service"
-	install -Dm644 "$srcdir/81voltd.service" \
-		"$subpkgdir/usr/lib/systemd/system/81voltd.service"
 	install -Dm644 "$srcdir/80-device-lge-joan.preset" \
 		"$subpkgdir/usr/lib/systemd/system-preset/80-device-lge-joan.preset"
 }
 
 sha512sums="
-4b998eb1aac5a4f99298244526b5c2e52cde6f92f16820ba00ac5b0a18ff503ee86556e2381581ddec9f9b700e33be7f6fbe7c4b7e7646e0cfff6ce5760b8c6c  rmtfs.service
-3d31393b0bae0f3d580d7cea3ab532ceabe82007f408258ac8712153e288bd1b4b114768117af0d6c533f553c0d0b062008a171755e773c672ad626968e97822  81voltd.service
 20380b0d0d2602b10fe062f06f9424bc0f0c7c8f937443d9a2b6ae7816a74da6b08c26d447a8e03ed4fc08060d7151e6fe7db6499960207f751832375f27a95c  80-device-lge-joan.preset
 "
