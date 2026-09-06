@@ -165,9 +165,12 @@ hosted elsewhere and linked from the release notes. Every release carries
 
 Non-destructive to the phone: the only internal partition touched is `laf`
 (LG's download-mode slot), so your current ROM, its data, and recovery stay
-intact. pmOS boots when you trigger download mode (power off, hold vol-up,
-plug in USB); normal power-on still boots your regular ROM, and reflashing
-the stock `laf` image restores download mode.
+intact. pmOS boots when you trigger download mode — power off, hold
+**Volume Up**, plug in USB; the same button command works on both variants
+and needs no adb or fastboot. Normal power-on still boots your regular ROM,
+and reflashing the stock `laf` image restores download mode. Recovery
+flashable zips that do the laf + card steps automatically ship for both
+variants (see below).
 
 Requirements: a way to write `laf`, and an SD card you can afford to lose —
 **the card is overwritten completely (back it up first)**; pmOS repartitions
@@ -192,28 +195,33 @@ pmOS with an fstab entry (by UUID or label); Android auto-mounts only the
 first mountable partition on a card, later ones need manual mounting. Keep
 one pmOS copy per card: the image UUID is fixed and duplicates collide.
 
-### Internal install (replaces Android user data)
+### Internal install (replaces the current ROM, boots from power-on)
 
-US998-class fastboot only; the H932 uses the recovery zip or dd routes
-instead:
+Both variants ship as a recovery-flashable zip, sideloaded exactly like a
+LineageOS ROM: rootfs inside `userdata` (the bigger partition) + `boot.img`
+to `boot`. Fastboot is not required. For US998-class devices, fastboot with
+the advanced loose images is an optional equivalent:
 
 ```sh
-fastboot flash boot boot.img
+fastboot flash boot boot.img           # optional fastboot route (US998-class)
 fastboot flash userdata lge-joan-root.img
 ```
 
-`userdata` becomes the pmOS root and auto-expands on first boot. This wipes
-Android user data.
+`userdata` becomes the pmOS root and auto-expands on first boot. **This
+wipes Android user data and replaces the ROM — back up first.**
 
 ### H932 recovery zip install
 
 H932 has no usable fastboot, but it has recovery: LineageOS recovery or TWRP.
-Flash a zip built with `--recovery-install-partition=external_sd`; it
-repartitions the SD card into `pmOS_boot` + `pmOS_root`, installs pmOS
-there, and leaves Android `system` intact. The default zip targets `system`
-and destroys Android — never flash that one. With kernel flashing enabled
-(no `--recovery-no-kernel`) the phone boots pmOS from the normal boot
-partition; reflash a LineageOS boot image to go back.
+Two zips:
+
+* **SD card zip** — repartitions the SD card into `pmOS_boot` + `pmOS_root`
+  and flashes `boot.img` to `laf`; the ROM stays intact.
+* **Internal zip** — installs the rootfs inside `userdata` and flashes
+  `boot.img` to `boot`; pmOS boots from power-on and replaces the ROM.
+
+The default pmbootstrap zip (`INSTALL_PARTITION=system`) is destructive to
+Android — always pass `external_sd` or `userdata` explicitly.
 
 ### Advanced install
 
