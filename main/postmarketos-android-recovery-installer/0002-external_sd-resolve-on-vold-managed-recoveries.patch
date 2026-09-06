@@ -1,0 +1,75 @@
+--- a/pmos_install_functions
++++ b/pmos_install_functions
+@@ -40,6 +40,48 @@
+ 		'!/^#/ && /(^|\s*)\/'"$2"'/ {print $src; exit;}' /"$1"
+ }
+ 
++# Print the block device of the external SD card, or nothing.
++#
++# "external_sd" is not a PARTLABEL anywhere -- it is a whole separate block
++# device -- so findfs can never resolve it. The only other route upstream
++# offers is an "/external_sd" mount point in the recovery fstab, which is a
++# TWRP convention. AOSP-derived recoveries (e.g. LineageOS) instead declare
++# the slot as a vold-managed sysfs path with no /dev column, which
++# get_fstab_device() cannot parse. Fall back to storage topology: take the
++# MMC block device that is not the one carrying the "boot" partition.
++resolve_external_sd() {
++	local bootdev intdev cand name removable ctype
++
++	bootdev=$(findfs PARTLABEL="boot" 2>/dev/null || true)
++	if [ -z "$bootdev" ]; then
++		bootdev=$(readlink -fn /dev/block/bootdevice/by-name/boot \
++			2>/dev/null || true)
++	fi
++
++	intdev=""
++	if [ -n "$bootdev" ]; then
++		intdev=$(basename "$(readlink -fn "$bootdev" 2>/dev/null \
++			|| echo "$bootdev")")
++		# strip the partition suffix: mmcblk0p43 -> mmcblk0, sde12 -> sde
++		intdev=$(echo "$intdev" | sed -e 's/p[0-9]*$//' -e 's/[0-9]*$//')
++	fi
++
++	for cand in /dev/block/mmcblk1 /dev/block/mmcblk0; do
++		[ -b "$cand" ] || continue
++		name=$(basename "$cand")
++		[ -n "$intdev" ] && [ "$name" = "$intdev" ] && continue
++
++		removable=$(cat /sys/block/"$name"/removable 2>/dev/null || true)
++		ctype=$(cat /sys/block/"$name"/device/type 2>/dev/null || true)
++		echo "SD card found at $cand" \
++			"(removable=${removable:-?} type=${ctype:-?})" >&2
++		echo "$cand"
++		return 0
++	done
++
++	return 1
++}
++
+ extract_partition_table() {
+ 	fstab_recovery="recovery.fstab"
+ 	# TWRP can use twrp.fstab instead of recovery.fstab (device specific)
+@@ -50,8 +92,21 @@
+ 
+ 	if [ -n "$INSTALL_PARTITION" ]; then
+ 		# We need to resolve symlinks, to make set_subpartitions() work.
+-		dev=$(findfs PARTLABEL="$INSTALL_PARTITION") || \
+-			dev=$(readlink -fn "$(get_fstab_device "$fstab_recovery" "$INSTALL_PARTITION")")
++		# Guard each substitution: under busybox ash "set -e" a failing
++		# command substitution aborts the script even on the left side
++		# of "||", so the fallback would never be reached.
++		dev=$(findfs PARTLABEL="$INSTALL_PARTITION" 2>/dev/null || true)
++		if [ -z "$dev" ]; then
++			fstab_dev=$(get_fstab_device "$fstab_recovery" \
++				"$INSTALL_PARTITION" 2>/dev/null || true)
++			if [ -n "$fstab_dev" ]; then
++				dev=$(readlink -fn "$fstab_dev" 2>/dev/null || true)
++			fi
++		fi
++	fi
++
++	if [ -z "$dev" ] && [ "$INSTALL_PARTITION" = "external_sd" ]; then
++		dev=$(resolve_external_sd || true)
+ 	fi
+ 
+ 	if [ -n "$dev" ]; then

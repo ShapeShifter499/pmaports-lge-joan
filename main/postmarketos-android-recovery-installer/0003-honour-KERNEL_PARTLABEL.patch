@@ -1,0 +1,33 @@
+--- a/pmos_install_functions
++++ b/pmos_install_functions
+@@ -122,13 +122,27 @@
+ 		export INITFS_PARTITION
+ 		INITFS_PARTITION=$(findfs PARTLABEL="$INITFS_PARTLABEL")
+ 	else
+-		dev=$(findfs PARTLABEL="boot") || \
+-			dev=$(readlink -fn "$(get_fstab_device "$fstab_recovery" boot)")
++		# Honour KERNEL_PARTLABEL from install_options. Hardcoding "boot"
++		# ignores devices that flash the kernel elsewhere (e.g. "laf" on
++		# LG devices booting pmOS from download mode).
++		dev=$(findfs PARTLABEL="$KERNEL_PARTLABEL" 2>/dev/null || true)
++		if [ -z "$dev" ]; then
++			dev=$(readlink -fn \
++				"/dev/block/bootdevice/by-name/$KERNEL_PARTLABEL" \
++				2>/dev/null || true)
++		fi
++		if [ -z "$dev" ]; then
++			fstab_dev=$(get_fstab_device "$fstab_recovery" \
++				"$KERNEL_PARTLABEL" 2>/dev/null || true)
++			if [ -n "$fstab_dev" ]; then
++				dev=$(readlink -fn "$fstab_dev" 2>/dev/null || true)
++			fi
++		fi
+ 		if [ -n "$dev" ]; then
+ 			echo "boot partition found at $dev"
+ 			export BOOT_PARTITION="$dev"
+ 		else
+-			echo "Couldn't find boot partition."
++			echo "Couldn't find $KERNEL_PARTLABEL partition."
+ 			return 1
+ 		fi
+ 	fi

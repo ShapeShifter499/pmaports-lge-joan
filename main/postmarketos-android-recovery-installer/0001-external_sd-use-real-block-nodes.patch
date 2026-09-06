@@ -1,0 +1,22 @@
+--- a/pmos_install_functions
++++ b/pmos_install_functions
+@@ -96,7 +96,17 @@
+ 
+ set_subpartitions() {
+ 	export PMOS_BOOT
+-	PMOS_BOOT=/dev/mapper/"$(basename "$INSTALL_DEVICE")"p1
+ 	export ROOT_PARTITION
+-	ROOT_PARTITION=/dev/mapper/"$(basename "$INSTALL_DEVICE")"p2
++
++	if [ "$INSTALL_PARTITION" = "external_sd" ]; then
++		# partition_install_device() deliberately skips kpartx for
++		# external_sd, so no /dev/mapper/ nodes are ever created for it.
++		# The kernel itself creates the real partition nodes after
++		# partprobe, so address those directly.
++		PMOS_BOOT="/dev/block/$(basename "$INSTALL_DEVICE")p1"
++		ROOT_PARTITION="/dev/block/$(basename "$INSTALL_DEVICE")p2"
++	else
++		PMOS_BOOT=/dev/mapper/"$(basename "$INSTALL_DEVICE")"p1
++		ROOT_PARTITION=/dev/mapper/"$(basename "$INSTALL_DEVICE")"p2
++	fi
+ }

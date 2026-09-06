@@ -1,14 +1,18 @@
 maintainer="Oliver Smith <ollieparanoid@postmarketos.org>"
 pkgname=postmarketos-android-recovery-installer
 pkgver=1.0.7
-pkgrel=1
+pkgrel=2
 pkgdesc="TWRP compatible postmarketOS installer script"
 arch="all"
 url="https://postmarketos.org"
 license="GPL-3.0-or-later"
 # multipath-tools: kpartx
 depends="busybox-extras lddtree cryptsetup multipath-tools device-mapper parted util-linux zip e2fsprogs tar"
-source="https://gitlab.com/postmarketos/postmarketos-android-recovery-installer/-/archive/$pkgver/postmarketos-android-recovery-installer-$pkgver.tar.gz"
+source="https://gitlab.com/postmarketos/postmarketos-android-recovery-installer/-/archive/$pkgver/postmarketos-android-recovery-installer-$pkgver.tar.gz
+	0001-external_sd-use-real-block-nodes.patch
+	0002-external_sd-resolve-on-vold-managed-recoveries.patch
+	0003-honour-KERNEL_PARTLABEL.patch
+	"
 options="!check" # No tests
 
 build() {
@@ -31,4 +35,7 @@ package() {
 }
 sha512sums="
 22481d26d78388eb67278a1ddd699abc3ca1c5df3c9f1d386d3fb95076e50d9209c8388d5700a6da5e476ac96023d55624c27b427767ee65775c24369dc11313  postmarketos-android-recovery-installer-1.0.7.tar.gz
+41b35e6bda37d7d05116a4bcfd5d26d77ca087d68101798cbe9136aea8e49ada08ad7153c0a70f5261a44b1ff04fe5794c884a119ecfc18eb844b88dace11828  0001-external_sd-use-real-block-nodes.patch
+5aa11bece52248fdd2c48e6494de03b52e6b999dda5d3d13bbbc12486ba0b90110c63f0948f89e851f1e6d4b662a4be4c142cec3a3873f3b6060c05bfbd00209  0002-external_sd-resolve-on-vold-managed-recoveries.patch
+02659c56b25c56d0ffd8b58bab75cb58eddaf5f2be495d3bca6a072351733a91992461ddbb50840e98aa26d408c4732e4f5210bd103dbff6cd566b36d30bcf08  0003-honour-KERNEL_PARTLABEL.patch
 "
