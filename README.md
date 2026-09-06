@@ -149,9 +149,21 @@ Working copies of the extra packages still live in
 [`ShapeShifter499/lg-v30-joan-pmos-packages`](https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages);
 a first `pmbootstrap install` does not copy them in.
 
-A first image already has GPU, Bluetooth, modem, ADSP, IPA, WLAN, zap, the
-joan UCM profile, and the VoLTE metapackage (`lge-joan-volte` → `joan-imsd`,
-ModemManager, 81voltd, rmtfs, Calls). First-boot IMS steps:
+A first image already carries GPU/display, Bluetooth, WLAN and modem firmware,
+the joan UCM profile, and the VoLTE metapackage (`lge-joan-volte` →
+`joan-imsd`, ModemManager, 81voltd, rmtfs, Calls). Hardware status:
+
+| subsystem | state in this image |
+|---|---|
+| display / GPU | enabled in the pinned kernel; device-verified in lab builds |
+| battery (FG %, charger) | enabled by the kernel config (r5+); FG verified on hardware, 2026-08-07 |
+| Bluetooth | driver + firmware + DT in image; device-verified on lab RAM boots only |
+| Wi-Fi (WCN3990) | driver + firmware + DT in image; scan + one association proven on lab RAM boots; disconnect/rekey hang is an open upstream-class bug |
+| cellular / VoLTE | stack installed and auto-enabled on systemd via presets; carried a live call on one network (lab build) |
+
+**This image as a whole has not been device-qualified end-to-end.** Each row
+above was proven on lab RAM-boot builds; a qualification run of the exact
+published image is pending. First-boot IMS steps:
 `device/testing/lge-joan-volte/FIRST-INSTALL-VOLTE.md`.
 
 ## Caveats

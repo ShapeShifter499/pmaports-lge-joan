@@ -12,7 +12,23 @@ sudo apk add lge-joan-volte
 # pulls: firmware (separate), modemmanager, rmtfs, 81voltd, calls, joan-imsd
 ```
 
-Enable the services that own the modem and IMS PDN:
+### systemd (pmOS edge, default)
+
+The services enable themselves via systemd presets. `lge-joan-volte-systemd`
+installs the `rmtfs` and `81voltd` units, `joan-imsd-systemd` installs the IMS
+UA unit, and the pmOS base preset plus `80-device-lge-joan.preset` enable them.
+After first boot, verify:
+
+```sh
+systemctl status rmtfs ModemManager 81voltd joan-imsd
+# all should be "active (running)" (joan-imsd: "running"; ModemManager may
+# show "running" or D-Bus activated)
+```
+
+Note: the Alpine `rmtfs` and `81voltd` packages ship bare binaries with no
+units; the units come from `lge-joan-volte-systemd`.
+
+### OpenRC (only if you chose openrc in pmbootstrap init)
 
 ```sh
 sudo rc-update add rmtfs default
@@ -23,6 +39,9 @@ sudo rc-service rmtfs start
 sudo rc-service modemmanager start
 sudo rc-service 81voltd start
 ```
+
+You must provide the `rmtfs` and `81voltd` init scripts yourself (Alpine ships
+none): `rmtfs -r -P -s` and `/usr/bin/81voltd`.
 
 ## 2. First SIM / first radio
 

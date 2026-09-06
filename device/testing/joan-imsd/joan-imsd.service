@@ -1,0 +1,16 @@
+[Unit]
+Description=LG V30 IMS registration (VoLTE SIP UA)
+Wants=ModemManager.service 81voltd.service
+After=ModemManager.service 81voltd.service
+ConditionPathExists=/usr/bin/joan-ims
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/joan-ims register
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/usr/lib/joan-imsd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
