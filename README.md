@@ -152,6 +152,36 @@ TWRP):
 * **Rooted Android `dd`**: write `boot.img` to the `laf` by-name partition
   and the SD rootfs image to the SD card, without touching anything else.
 
+> ⚠️ **Build recovery zips from a clean chroot.** `pmbootstrap install
+> --android-recovery-zip` tars the *persistent* device rootfs chroot as-is —
+> it never runs `create_fstab()`. So if that chroot was previously used for a
+> disk-image install, the zip inherits that run's build-time values:
+> `/etc/fstab` pinning `/` and `/boot` by UUID, and a `boot.img` cmdline
+> carrying `pmos_root_uuid=` / `pmos_boot_uuid=`. The on-phone installer
+> formats fresh partitions with new random UUIDs and writes only labels, so
+> both are dead on arrival.
+>
+> The two failures look unrelated but share this one cause: the initramfs
+> reports `[pmOS-rd] ERROR: failed to mount subpartitions`, or — if only the
+> cmdline was fixed — it boots into userspace and then
+> `systemd-remount-fs.service` fails and drops the phone to **emergency mode**.
+>
+> A zip built from a clean chroot ships upstream's comment-only `/etc/fstab`
+> ("This file is \*not\* used to mount / or /boot"; see
+> <https://postmarketos.org/fstab>) and a label-based cmdline, and installs
+> correctly. Run `pmbootstrap zap` before building a zip flavour, and do not
+> reuse a chroot across image and zip builds.
+>
+> To check a finished zip before flashing it:
+>
+> ```sh
+> # must be the comment-only default, not UUID= lines for / or /boot
+> unzip -p <zip> rootfs.tar.gz | tar -xzO ./etc/fstab
+>
+> # must print nothing
+> unzip -p <zip> boot.img | strings | grep -E 'pmos_(root|boot)_uuid=|root='
+> ```
+
 US998 still has usable fastboot.
 
 ## Prebuilt images
