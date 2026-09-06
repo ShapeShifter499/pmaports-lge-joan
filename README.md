@@ -11,8 +11,8 @@ mainline port. Upstream's own README follows below.
 | `device/testing/linux-lge-joan` | mainline kernel, pinned to a commit of [`ShapeShifter499/linux-lg-v30-joan`](https://github.com/ShapeShifter499/linux-lg-v30-joan) |
 | `device/testing/firmware-lge-joan` | text-only recipe: shared GPU/BT plus `-h930` / `-h932`. Fetches [`firmware-lge-joan-blobs`](https://github.com/ShapeShifter499/firmware-lge-joan-blobs) at a commit pin. **No owner tarball, no copy-in.** |
 | `device/testing/alsa-ucm-conf-lge-joan` | ALSA UCM so PipeWire sees the jack instead of dummy output |
-| `device/testing/joan-imsd` | 3GPP IMS SIP UA (VoLTE). OpenRC `joan-imsd`, CLI `joan-ims dial` |
-| `device/testing/lge-joan-volte` | first-boot metapackage: MM + 81voltd + rmtfs + calls + joan-imsd |
+| `device/testing/joan-imsd` | 3GPP IMS SIP UA (VoLTE). systemd unit + CLI `joan-ims dial`; per-message transport criterion and carrier-profile layer ported from the LineageOS findings |
+| `device/testing/lge-joan-volte` | first-boot metapackage: MM + 81voltd + rmtfs + calls + joan-imsd; the `-systemd` subpackage ships only the joan preset and uses Alpine's own `rmtfs-systemd` / `81voltd-systemd` units |
 
 Everything else in this tree is unmodified upstream pmaports. The GPU/display
 enablement lives in that kernel pin, not as a carried patch series here.
@@ -139,6 +139,55 @@ On an **H932**, `fastboot boot` and `fastboot flash` both return
 that installer repartitions `system` and destroys a LineageOS install. The
 working H932 path is a microSD rootfs plus writing `boot.img` from a rooted
 Android/`dd` shell (or the laf slot). US998 still has usable fastboot.
+
+## Prebuilt images
+
+Pre-alpha images are published as GitHub Releases when the assets fit the
+2 GB per-file limit (rootfs images ship xz-compressed); oversized assets are
+hosted elsewhere and linked from the release notes. Every release carries
+`SHA256SUMS` and an ALPHA status file.
+
+### SD card install
+
+Requirements: a **wiped** SD card (its contents are destroyed) and a way to
+write `laf`.
+
+1. Flash `boot.img` to `laf` — `fastboot flash laf boot.img` on US998-class
+   devices; on an exact H932 (no usable fastboot) `dd` it to
+   `/dev/block/bootdevice/by-name/laf` from a rooted Android shell.
+2. Write the rootfs image to the card:
+   `xz -dc lge-joan.img.xz | dd of=/dev/sdX bs=4M conv=fsync`
+   (`/dev/sdX` is the whole card, e.g. `/dev/sdb`.)
+3. First boot grows the root filesystem to fill the card (minutes; reboots
+   may follow).
+
+**Shared data partition tip:** the rootfs image is a raw ext4 that only grows
+on boot. Partition the card first (exFAT data partition works in Android and
+pmOS), then create one more partition in the last free space at least as
+large as the image, and `dd` the image into that partition instead of the
+whole card. pmOS finds its root by ext4 UUID and expands to fill that
+partition; the data partition is untouched. Mount the shared partition in
+pmOS with an fstab entry (by UUID or label); Android auto-mounts only the
+first mountable partition on a card, later ones need manual mounting. Keep
+one pmOS copy per card: the image UUID is fixed and duplicates collide.
+
+### Internal install (replaces Android user data)
+
+US998-class fastboot only:
+
+```sh
+fastboot flash boot boot.img
+fastboot flash userdata lge-joan-root.img
+```
+
+`userdata` becomes the pmOS root and auto-expands on first boot. This wipes
+Android user data.
+
+### Advanced install
+
+`boot.img` and the rootfs image can be written to any partition or block
+device large enough. Root discovery is by ext4 UUID, so the location does not
+matter as long as the kernel can see the device; see the UUID caveat above.
 
 ## Packages that live in the other repo
 
