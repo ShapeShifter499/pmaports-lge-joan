@@ -144,10 +144,11 @@ TWRP):
   power-on still boots your ROM, pmOS boots via download mode. The default
   pmbootstrap zip (`INSTALL_PARTITION=system`) is destructive to Android —
   always pass `external_sd`.
-* **Internal zip** (`system` + boot): installs the rootfs inside the
-  `system` partition (flashed like a LineageOS ROM zip) and flashes
-  `boot.img` to the `boot` partition — pmOS boots straight from power-on and
-  replaces the current ROM (restore by reflashing the ROM).
+* **Internal zip** (`userdata` + boot): flashed from recovery like a
+  LineageOS ROM zip; installs the rootfs inside the `userdata` partition
+  (the bigger partition) and flashes `boot.img` to the `boot` partition —
+  pmOS boots straight from power-on and replaces the current ROM (restore by
+  reflashing the ROM).
 * **Rooted Android `dd`**: write `boot.img` to the `laf` by-name partition
   and the SD rootfs image to the SD card, without touching anything else.
 
