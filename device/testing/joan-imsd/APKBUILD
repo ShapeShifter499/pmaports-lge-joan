@@ -42,7 +42,7 @@ package() {
 	done
 	install -Dm644 "$srcdir/carrier-profiles.json" \
 		"$pkgdir/usr/share/joan-imsd/carrier-profiles.json"
-	install -Dm644 "$srcdir/profiles/cmcc-cn.yaml" \
+	install -Dm644 "$srcdir/cmcc-cn.yaml" \
 		"$pkgdir/usr/share/joan-imsd/profiles/cmcc-cn.yaml"
 	install -Dm644 "$srcdir/tmo-us.yaml" \
 		"$pkgdir/usr/share/joan-imsd/profiles/tmo-us.yaml"
