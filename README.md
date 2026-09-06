@@ -168,8 +168,9 @@ intact. pmOS boots when you trigger download mode (power off, hold vol-up,
 plug in USB); normal power-on still boots your regular ROM, and reflashing
 the stock `laf` image restores download mode.
 
-Requirements: a **wiped** SD card (its contents are destroyed) and a way to
-write `laf`.
+Requirements: a way to write `laf`, and an SD card you can afford to lose —
+**the card is overwritten completely (back it up first)**; pmOS repartitions
+it into `pmOS_boot` + `pmOS_root`, destroying every byte on it.
 
 1. Flash `boot.img` to `laf` — `fastboot flash laf boot.img` on US998-class
    devices; on an exact H932 (no usable fastboot) `dd` it to
