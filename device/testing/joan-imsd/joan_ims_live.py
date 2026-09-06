@@ -18,6 +18,7 @@ import uuid
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import joan_ims_esp as esp
 import joan_ims_ipsec as ipsec
+import joan_ims_profiles as profiles
 import joan_ims_register as reg
 
 ISIM_AID = "A0000000871004FFFFFFFF8907030000"
@@ -131,6 +132,16 @@ def open_isim() -> int:
     if r.returncode == 0 and m:
         return int(m.group(1))
     return 2
+
+
+def operator_plmn():
+    """MCC/MNC from QMI card status; None when unavailable."""
+    r = qmicli("--uim-get-card-status")
+    m = re.search(r"MCC: '(\d+)'", r.stdout or "")
+    n = re.search(r"MNC: '(\d+)'", r.stdout or "")
+    if m and n:
+        return m.group(1), n.group(1)
+    return None
 
 
 def get_imei() -> str:
@@ -824,6 +835,14 @@ def main() -> int:
         spi_c=spi_c, spi_s=spi_s, port_c=port_c, port_s=port_s,
         ck=ck, ik=ik, security_verify=ss, imei=imei,
     )
+    _plmn = operator_plmn()
+    if _plmn:
+        _crit = int(profiles.select(*_plmn).get("tcp_criterion_len") or 0)
+        if reg.pick_transport(len(msg2), _crit) == "tcp":
+            # Per-message criterion says TCP (e.g. CMCC 1300). Inner TCP
+            # inside the userspace ESP SA needs the kernel-xfrm path
+            # (joan_ims_ipsec.py); log and stay on UDP for now.
+            print("TPT_NEEDS_TCP_OVER_XFRM", len(msg2), _crit, _plmn)
     src_b = socket.inet_pton(socket.AF_INET6, src)
     dst_b = socket.inet_pton(socket.AF_INET6, target)
     sa = EspSa(src, target, src_b, dst_b, port_c, pcscf_sec.port_s, pcscf_sec.spi_s, ck, ik)

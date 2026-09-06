@@ -24,6 +24,7 @@ import hashlib
 import os
 import re
 import secrets
+import socket
 import sys
 import uuid
 
@@ -65,6 +66,20 @@ def security_client(spi_c: int, spi_s: int, port_c: int, port_s: int) -> str:
 
 def bracket_ip(ip: str) -> str:
     return f"[{ip}]" if ":" in ip else ip
+
+
+def pick_transport(pkt_size: int, criterion_len: int) -> str:
+    """Per-message transport criterion, replicated from stock libims.lge.so
+    (TMUSAoS AdjustTcpCriterionPerMtu / SetTCPCriterionLength).
+
+    TCP only when the outbound SIP message exceeds the carrier's criterion
+    length (CMCC 1300, KR 4096); criterion 0 means disabled (T-Mobile). The
+    alpha7 blanket MCC-460 forced-TCP read of this was wrong and died with
+    tcp_fail=connect in the field.
+    """
+    if criterion_len > 0 and pkt_size > criterion_len:
+        return "tcp"
+    return "udp"
 
 
 def md5_hex(data: bytes) -> str:
@@ -183,6 +198,7 @@ def build_register(
     security_verify: str | None = None,
     expires: int = 600000,
     imei: str | None = None,
+    transport: str = "udp",
 ) -> bytes:
     if "@" not in impi:
         raise ValueError("IMPI must be user@realm")
@@ -245,7 +261,7 @@ def build_register(
     contact_user = public.split("@")[0].removeprefix("sip:").removeprefix("tel:")
     lines = [
         f"REGISTER {request_uri} SIP/2.0",
-        f"Via: SIP/2.0/UDP {via_host}:{local_port};branch={branch()};rport",
+        f"Via: SIP/2.0/{transport.upper()} {via_host}:{local_port};branch={branch()};rport",
         "Max-Forwards: 70",
         f"From: <{aor}>;tag={from_tag}",
         f"To: <{aor}>",
@@ -292,6 +308,64 @@ def required_headers_ok(pkt: bytes, *, expect_aka_response: bool) -> list[str]:
     return missing
 
 
+def send_transaction(
+    pkt: bytes,
+    host: str,
+    port: int,
+    transport_pref: str = "auto",
+    criterion_len: int = 0,
+    timeout: float = 5.0,
+) -> tuple[bytes | None, str, str]:
+    """Send one SIP request; return (reply, transport_used, error).
+
+    Stock semantics (libims TransmissionProxy): transport by size criterion;
+    UDP first with one TCP fallback on no-reply. A TCP connect failure falls
+    back to UDP; a completed TCP handshake that then times out does NOT fall
+    back and the CSeq must not be reused.
+    """
+    if transport_pref == "auto":
+        transport_pref = pick_transport(len(pkt), criterion_len)
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    if transport_pref == "tcp":
+        try:
+            t = socket.socket(family, socket.SOCK_STREAM)
+            t.settimeout(timeout)
+            t.connect((host, port))
+        except OSError:
+            transport_pref = "udp"  # connect failed: UDP fallback
+        else:
+            try:
+                t.sendall(pkt)
+                data = t.recv(65535)
+                t.close()
+                return data, "tcp", ""
+            except socket.timeout:
+                t.close()
+                return None, "tcp", "timeout"
+            except OSError:
+                t.close()
+                return None, "tcp", "reset"
+    s = socket.socket(family, socket.SOCK_DGRAM)
+    s.settimeout(timeout)
+    s.sendto(pkt, (host, port))
+    try:
+        data, _src = s.recvfrom(65535)
+        return data, "udp", ""
+    except socket.timeout:
+        if transport_pref == "udp":
+            try:
+                t = socket.socket(family, socket.SOCK_STREAM)
+                t.settimeout(timeout)
+                t.connect((host, port))
+                t.sendall(pkt)
+                data = t.recv(65535)
+                t.close()
+                return data, "tcp", ""
+            except OSError:
+                return None, "tcp", "connect"
+        return None, "udp", "timeout"
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     p.add_argument("--dry-run", action="store_true")
@@ -310,6 +384,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--ik-hex", default="")
     p.add_argument("--algorithm", default="AKAv1-MD5")
     p.add_argument("--www-authenticate", default="", help="raw WWW-Authenticate value")
+    p.add_argument("--transport", choices=("udp", "tcp", "auto"), default="udp")
+    p.add_argument("--tcp-criterion", type=int, default=0,
+                   help="size criterion for TCP (0=disabled); CMCC 1300, KR 4096")
     return p.parse_args(argv)
 
 
@@ -374,6 +451,22 @@ def self_test() -> int:
     if miss:
         print("second REGISTER missing", miss, file=sys.stderr)
         return 1
+    if pick_transport(1500, 1300) != "tcp" or pick_transport(1200, 1300) != "udp" \
+            or pick_transport(2000, 0) != "udp" or pick_transport(5000, 4096) != "tcp":
+        print("pick_transport fail", file=sys.stderr)
+        return 1
+    pkt_tcp = build_register(
+        impi=username,
+        realm=realm,
+        local_ip="2001:db8::2",
+        local_port=5060,
+        pcscf="2001:db8::1",
+        pcscf_port=5060,
+        transport="tcp",
+    )
+    if b"Via: SIP/2.0/TCP" not in pkt_tcp:
+        print("tcp Via missing", file=sys.stderr)
+        return 1
     print("SELF_TEST_OK", resp)
     return 0
 
@@ -415,18 +508,14 @@ def main(argv: list[str]) -> int:
     sys.stdout.buffer.write(pkt)
     if not args.send:
         return 0
-    import socket
-
-    family = socket.AF_INET6 if ":" in args.pcscf else socket.AF_INET
-    sock = socket.socket(family, socket.SOCK_DGRAM)
-    sock.settimeout(5)
-    sock.sendto(pkt, (args.pcscf, args.pcscf_port))
-    try:
-        data, src = sock.recvfrom(65535)
-    except TimeoutError:
-        print("\n# no UDP reply in 5s", file=sys.stderr)
+    data, used, err = send_transaction(
+        pkt, args.pcscf, args.pcscf_port,
+        transport_pref=args.transport, criterion_len=args.tcp_criterion,
+    )
+    if data is None:
+        print(f"\n# no reply ({used}, {err})", file=sys.stderr)
         return 3
-    sys.stderr.buffer.write(b"\n# reply from " + str(src).encode() + b"\n")
+    sys.stderr.buffer.write(f"\n# reply over {used}\n".encode())
     sys.stdout.buffer.write(data)
     return 0
 

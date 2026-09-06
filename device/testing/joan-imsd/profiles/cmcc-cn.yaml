@@ -1,0 +1,25 @@
+# China Mobile (MCC 460) — stock-derived overlay for joan-imsd.
+# Source: libims.lge.so CMCCAoSConfiguration + V300L world XML
+# (docs/lg-ims-carrier-extract-2026-09-04.md). No blobs shipped.
+name: cmcc-cn
+plmn: "460"
+ims_apn: ims
+ip_type: ipv6
+# P-CSCF via PCO (WDS Get Current Settings TLV 0x2e); ISIM list empty.
+pcscf: pco
+aka: AKAv1-MD5
+from_identity: impu
+auth_username: impi
+ipsec:
+  required: true
+  proto: esp
+  mode: trans
+  # Stock knob aos_reg_0_ipsec_algs=0x00070003; spi_3gpp=false.
+  algs_hex: "0x00070003"
+  spi_3gpp: false
+# libims: per-message TCP only above 1300 bytes; else UDP with TCP fallback.
+tcp_criterion_len: 1300
+# CMCC: pcscf_n=2 in the live dump, only the first is tried.
+conf_uri: ""
+offer_res_code: 183
+expires: 600000
