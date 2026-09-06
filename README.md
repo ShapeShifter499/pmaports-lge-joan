@@ -135,17 +135,19 @@ pmbootstrap flasher boot
 ```
 
 On an **H932**, `fastboot boot` and `fastboot flash` both return
-`unknown command`. Two install paths work:
+`unknown command`. Install via recovery zips instead (LineageOS recovery or
+TWRP):
 
-* **Recovery-flashable zip** (LineageOS recovery or TWRP): build with
-  `pmbootstrap install --android-recovery-zip --recovery-install-partition=external_sd`.
-  The installer repartitions the **SD card** into `pmOS_boot` + `pmOS_root`
-  and leaves the Android `system` partition intact. The default zip
-  (`INSTALL_PARTITION=system`) is destructive to Android — always pass
-  `external_sd`. Flash the kernel to `boot` by leaving out
-  `--recovery-no-kernel` (the phone then boots pmOS from the normal boot
-  partition; reflash a LineageOS boot image to go back), or keep
-  `--recovery-no-kernel` and boot pmOS from `laf` instead.
+* **SD card zip** (`external_sd`, laf boot): repartitions the **SD card**
+  into `pmOS_boot` + `pmOS_root`, flashes `boot.img` to **`laf`**, and leaves
+  the Android `system`, `data`, and `boot` partitions intact — normal
+  power-on still boots your ROM, pmOS boots via download mode. The default
+  pmbootstrap zip (`INSTALL_PARTITION=system`) is destructive to Android —
+  always pass `external_sd`.
+* **Internal zip** (`userdata` + boot): installs the rootfs inside
+  `userdata` and flashes `boot.img` to the `boot` partition — pmOS boots
+  straight from power-on and replaces the current ROM (restore by reflashing
+  the ROM's boot image).
 * **Rooted Android `dd`**: write `boot.img` to the `laf` by-name partition
   and the SD rootfs image to the SD card, without touching anything else.
 
