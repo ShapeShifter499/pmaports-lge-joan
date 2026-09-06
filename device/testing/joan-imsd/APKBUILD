@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=joan-imsd
 pkgver=0.1
-pkgrel=1
+pkgrel=2
 pkgdesc="3GPP IMS SIP UA for LG V30 (joan) VoLTE — AP-side, no vendor blobs"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -16,11 +16,14 @@ source="
 	joan-imsd.service
 	joan-ims.desktop
 	joan_ims_live.py
+	joan_ims_profiles.py
 	joan_ims_esp.py
 	joan_ims_ipsec.py
 	joan_ims_pco.py
 	joan_ims_register.py
 	joan_ims_ua.py
+	carrier-profiles.json
+	profiles/cmcc-cn.yaml
 	tmo-us.yaml
 	"
 
@@ -32,10 +35,15 @@ package() {
 		"$pkgdir/usr/share/joan-imsd/profiles" \
 		"$pkgdir/etc/joan-imsd" \
 		"$pkgdir/var/lib/joan-imsd"
-	for f in joan_ims_live.py joan_ims_esp.py joan_ims_ipsec.py \
-		joan_ims_pco.py joan_ims_register.py joan_ims_ua.py; do
+	for f in joan_ims_live.py joan_ims_profiles.py joan_ims_esp.py \
+		joan_ims_ipsec.py joan_ims_pco.py joan_ims_register.py \
+		joan_ims_ua.py; do
 		install -Dm644 "$srcdir/$f" "$pkgdir/usr/lib/joan-imsd/$f"
 	done
+	install -Dm644 "$srcdir/carrier-profiles.json" \
+		"$pkgdir/usr/share/joan-imsd/carrier-profiles.json"
+	install -Dm644 "$srcdir/profiles/cmcc-cn.yaml" \
+		"$pkgdir/usr/share/joan-imsd/profiles/cmcc-cn.yaml"
 	install -Dm644 "$srcdir/tmo-us.yaml" \
 		"$pkgdir/usr/share/joan-imsd/profiles/tmo-us.yaml"
 }
@@ -57,11 +65,14 @@ be3ef7043a777d1b58283a957effabb951d6059f04f6dde1ef397b94856ee03fbdad42a78621aa3c
 c3eef9cd3224d58815dc3f7372f93caddebb554857d8c8841f09bb5d777e127acf91c9f6570e39c17a8a05aad5ec666a16fe5c6e69fd5871926ee44bc7e62162  joan-imsd.initd
 6436c6ed67fcd988b2ca732e40023b6ee466cd70f43a3ff8cbd9738a0a537ca42fec3a079dedc4e5445cecd64a10cccbfed16b9cab5a485f699a865b976af573  joan-imsd.service
 406962def62a9f5a16f23d475d1b926ebd0ca7a61b5e6dfe5e3f9aee355d8070e15fbe034217969bedd4b8a5ff49e53bd61e7e1e9348083dbe4baedfbe4f2073  joan-ims.desktop
-a596d0037c20860087d5fd09c78dccf7b0c8b6e80ce8681b05d6abe1839988ad6f215582260075597ff374cf1fffc6f65af2f655b772d40ca9979cf9417d2472  joan_ims_live.py
+60102123992ff890e254eaeaa16966ac637aa41745c309d53cce1390a528aeaae49900e90e56e213854848b68e478f9cda1f87e90709cc1b30e6f7f9ccd808ff  joan_ims_live.py
+3de09a7adf2857a6bda95a2fa7d2560444f1cefa33d9f93023191689a50abae3492d2dffff152496548880e635cf5679c4424c557dae254023e78bda62d39fa3  joan_ims_profiles.py
 33a6b74d7f2b9177336c6b5cbcab3a26c248370ee9e569748a8d7fddfe6512de795cc0599c791823b87990345b0b489f624533b2fffed205397e168848959c99  joan_ims_esp.py
 1c1864cf14db6782c5e749314088808d6fe56244474012c3759bfa374ec8475cb2072aa36a8d52e57d60da60090cfbeb3a76c83dcd3977a031b7ee37497672e1  joan_ims_ipsec.py
 c1ef1002b8a5d896d6036e7d29b853be5b72cf740bab3bcdda8b250d4a408c9e04ff4aba3ea032ab6cb205129e5befcb219f611539304c547cc70f78c06aca2b  joan_ims_pco.py
-8028d782ca4abee093127631b16df586e8576a7cff60cdfe049771b19c6db502d3ef0e34a8083db296fcfe4b4322a651bf14a850305e41908e4110c9dd4bc77d  joan_ims_register.py
+84ae407ddf3e53a094d2f6cbb33a9d49bd5af6245abed9e183bd4f93d087753ed2c83efb67b2c3e8364ef7426c1db0b63935d89ec7dc1e22fe963cbdcdbb1918  joan_ims_register.py
 95c1c7393f6603c41f79b5493a6282e899233eeb5460f79ab0ceefaede9367e321baff58442944cb28287b9478a3754d6eb82109c8573e063e31600897bad2e9  joan_ims_ua.py
+5572527be69fccc7a5ee3d9a2e1a8cab6161e64160e1081d737dbc56546618185dfddf65b298d233f2fba31cb6840fd8559d49e30d7018368584e3f5300c12e3  carrier-profiles.json
+51d53622134a8b7437bef08c8a2d2c779af64884b8ad9c1f35f167b8d08e77beac0e21ce860c3ad2751345ef1e65a71de3bab287b8492eb19a2662eb08b86662  profiles/cmcc-cn.yaml
 992bf1c72e72f1ff89ef41caf8e1db29dda577bc7d77b1a81eb5318d87462b7c0279942343704c5fb7b86cf5e0ca2b1aa0f1a7dd64c1bd69d64b37b8a15a59b1  tmo-us.yaml
 "
