@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=joan-imsd
 pkgver=0.1
-pkgrel=2
+pkgrel=3
 pkgdesc="3GPP IMS SIP UA for LG V30 (joan) VoLTE — AP-side, no vendor blobs"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -63,7 +63,7 @@ systemd_unit() {
 sha512sums="
 be3ef7043a777d1b58283a957effabb951d6059f04f6dde1ef397b94856ee03fbdad42a78621aa3c46f2f38859a42ca3a28c31ae87cdb69d433eb665ac200005  joan-ims
 c3eef9cd3224d58815dc3f7372f93caddebb554857d8c8841f09bb5d777e127acf91c9f6570e39c17a8a05aad5ec666a16fe5c6e69fd5871926ee44bc7e62162  joan-imsd.initd
-6436c6ed67fcd988b2ca732e40023b6ee466cd70f43a3ff8cbd9738a0a537ca42fec3a079dedc4e5445cecd64a10cccbfed16b9cab5a485f699a865b976af573  joan-imsd.service
+80431240ba496de1edd33e4c54a5cd4a216ea1d3237a6521fd264e2a13bea45ed6cf4b1204887799bcc0aed71565b104f0929a70b2f0dad7fef2f4452ce06472  joan-imsd.service
 406962def62a9f5a16f23d475d1b926ebd0ca7a61b5e6dfe5e3f9aee355d8070e15fbe034217969bedd4b8a5ff49e53bd61e7e1e9348083dbe4baedfbe4f2073  joan-ims.desktop
 60102123992ff890e254eaeaa16966ac637aa41745c309d53cce1390a528aeaae49900e90e56e213854848b68e478f9cda1f87e90709cc1b30e6f7f9ccd808ff  joan_ims_live.py
 3de09a7adf2857a6bda95a2fa7d2560444f1cefa33d9f93023191689a50abae3492d2dffff152496548880e635cf5679c4424c557dae254023e78bda62d39fa3  joan_ims_profiles.py
