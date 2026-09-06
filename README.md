@@ -135,10 +135,21 @@ pmbootstrap flasher boot
 ```
 
 On an **H932**, `fastboot boot` and `fastboot flash` both return
-`unknown command`. Do not use `pmbootstrap install --android-recovery-zip` —
-that installer repartitions `system` and destroys a LineageOS install. The
-working H932 path is a microSD rootfs plus writing `boot.img` from a rooted
-Android/`dd` shell (or the laf slot). US998 still has usable fastboot.
+`unknown command`. Two install paths work:
+
+* **Recovery-flashable zip** (LineageOS recovery or TWRP): build with
+  `pmbootstrap install --android-recovery-zip --recovery-install-partition=external_sd`.
+  The installer repartitions the **SD card** into `pmOS_boot` + `pmOS_root`
+  and leaves the Android `system` partition intact. The default zip
+  (`INSTALL_PARTITION=system`) is destructive to Android — always pass
+  `external_sd`. Flash the kernel to `boot` by leaving out
+  `--recovery-no-kernel` (the phone then boots pmOS from the normal boot
+  partition; reflash a LineageOS boot image to go back), or keep
+  `--recovery-no-kernel` and boot pmOS from `laf` instead.
+* **Rooted Android `dd`**: write `boot.img` to the `laf` by-name partition
+  and the SD rootfs image to the SD card, without touching anything else.
+
+US998 still has usable fastboot.
 
 ## Prebuilt images
 
@@ -173,7 +184,8 @@ one pmOS copy per card: the image UUID is fixed and duplicates collide.
 
 ### Internal install (replaces Android user data)
 
-US998-class fastboot only:
+US998-class fastboot only; the H932 uses the recovery zip or dd routes
+instead:
 
 ```sh
 fastboot flash boot boot.img
@@ -182,6 +194,16 @@ fastboot flash userdata lge-joan-root.img
 
 `userdata` becomes the pmOS root and auto-expands on first boot. This wipes
 Android user data.
+
+### H932 recovery zip install
+
+H932 has no usable fastboot, but it has recovery: LineageOS recovery or TWRP.
+Flash a zip built with `--recovery-install-partition=external_sd`; it
+repartitions the SD card into `pmOS_boot` + `pmOS_root`, installs pmOS
+there, and leaves Android `system` intact. The default zip targets `system`
+and destroys Android — never flash that one. With kernel flashing enabled
+(no `--recovery-no-kernel`) the phone boots pmOS from the normal boot
+partition; reflash a LineageOS boot image to go back.
 
 ### Advanced install
 
