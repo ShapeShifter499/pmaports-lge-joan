@@ -8,11 +8,12 @@ url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
 license="MIT"
 depends="python3 qmi-utils modemmanager 81voltd"
-subpackages="$pkgname-openrc"
+subpackages="$pkgname-openrc $pkgname-systemd:systemd_unit"
 options="!check"
 source="
 	joan-ims
 	joan-imsd.initd
+	joan-imsd.service
 	joan-ims.desktop
 	joan_ims_live.py
 	joan_ims_esp.py
@@ -43,9 +44,18 @@ openrc() {
 	install -Dm755 "$srcdir/joan-imsd.initd" "$subpkgdir/etc/init.d/joan-imsd"
 }
 
+systemd_unit() {
+	pkgdesc="systemd service for joan-imsd"
+	install_if="$pkgname=$pkgver-r$pkgrel systemd"
+
+	install -Dm644 "$srcdir/joan-imsd.service" \
+		"$subpkgdir/usr/lib/systemd/system/joan-imsd.service"
+}
+
 sha512sums="
 be3ef7043a777d1b58283a957effabb951d6059f04f6dde1ef397b94856ee03fbdad42a78621aa3c46f2f38859a42ca3a28c31ae87cdb69d433eb665ac200005  joan-ims
 c3eef9cd3224d58815dc3f7372f93caddebb554857d8c8841f09bb5d777e127acf91c9f6570e39c17a8a05aad5ec666a16fe5c6e69fd5871926ee44bc7e62162  joan-imsd.initd
+6436c6ed67fcd988b2ca732e40023b6ee466cd70f43a3ff8cbd9738a0a537ca42fec3a079dedc4e5445cecd64a10cccbfed16b9cab5a485f699a865b976af573  joan-imsd.service
 406962def62a9f5a16f23d475d1b926ebd0ca7a61b5e6dfe5e3f9aee355d8070e15fbe034217969bedd4b8a5ff49e53bd61e7e1e9348083dbe4baedfbe4f2073  joan-ims.desktop
 a596d0037c20860087d5fd09c78dccf7b0c8b6e80ce8681b05d6abe1839988ad6f215582260075597ff374cf1fffc6f65af2f655b772d40ca9979cf9417d2472  joan_ims_live.py
 33a6b74d7f2b9177336c6b5cbcab3a26c248370ee9e569748a8d7fddfe6512de795cc0599c791823b87990345b0b489f624533b2fffed205397e168848959c99  joan_ims_esp.py

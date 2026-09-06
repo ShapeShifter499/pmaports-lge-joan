@@ -1,0 +1,4 @@
+# LG V30 (joan) services not covered by the pmOS base preset.
+# rmtfs.service, 81voltd.service and qrtr-ns.service are already in
+# 90-base.preset; this file only adds the joan IMS UA.
+enable joan-imsd.service
