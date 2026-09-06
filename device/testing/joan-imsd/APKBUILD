@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=joan-imsd
 pkgver=0.1
-pkgrel=0
+pkgrel=1
 pkgdesc="3GPP IMS SIP UA for LG V30 (joan) VoLTE — AP-side, no vendor blobs"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
