@@ -1,4 +1,4 @@
-From c0d38d24b7f0ba92532fef00cb6432ccf647206a Mon Sep 17 00:00:00 2001
+From fb968169503b4102340917c15956f533ab40be6c Mon Sep 17 00:00:00 2001
 From: Lance <Gero3977@gmail.com>
 Date: Mon, 7 Sep 2026 01:12:28 -0700
 Subject: [PATCH] ASoC: qdsp6: q6routing: make the capture COPP topology
@@ -62,7 +62,7 @@ index 4f56999b7fab..6c65c88857c6 100644
  struct route_payload {
  	int num_copps;
 diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
-index 7386226046fa..3745c664d6f7 100644
+index 7386226046fa..4972a6cf2a55 100644
 --- a/sound/soc/qcom/qdsp6/q6routing.c
 +++ b/sound/soc/qcom/qdsp6/q6routing.c
 @@ -339,14 +339,73 @@ struct session_data {
@@ -94,7 +94,7 @@ index 7386226046fa..3745c664d6f7 100644
 + * default stays NULL_COPP_TOPOLOGY so behaviour is unchanged unless asked for.
 + */
 +static const char * const tx_topology_text[] = {
-+	"None", "SM ECNS", "DM Fluence", "QMIC Fluence", "DM RFECNS",
++	"None", "SM_ECNS", "DM_Fluence", "QMIC_Fluence", "DM_RFECNS",
 +};
 +
 +static const unsigned int tx_topology_id[] = {
