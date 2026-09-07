@@ -1,0 +1,39 @@
+--- a/drivers/net/ipa/ipa_mem.c
++++ b/drivers/net/ipa/ipa_mem.c
+@@ -452,6 +452,23 @@
+  *
+  * Note: @addr and @size are not guaranteed to be page-aligned.
+  */
++/* JOAN: ipa_data-v3.1 declares imem_addr 0x146bd000 -- the same value as
++ * ipa_data-v3.5.1 (sdm845), whose DT derives it from IMEM at 0x14680000 plus a
++ * 0x3d000 modem-tables slice.  sdm845 also carries "sram = <&ipa_modem_tables>"
++ * so its driver never uses the constant; msm8998 has no such property and falls
++ * back to it.  LG's downstream tree places msm8998 IMEM at 0x146bf000.  If the
++ * constant is wrong for this SoC then IPA is pointed at the wrong window, finds
++ * no modem tables there, and dereferences a near-null pointer -- which is what
++ * ipa.lowmem=1 currently papers over.  Override from the cmdline to test:
++ *
++ *   ipa.imem_addr=0x146bf000
++ *
++ * Zero keeps whatever the version data specifies.
++ */
++static unsigned long imem_addr_override;
++module_param_named(imem_addr, imem_addr_override, ulong, 0444);
++MODULE_PARM_DESC(imem_addr, "JOAN: override IMEM base (0 = use version data)");
++
+ /* JOAN: IPA faults at a tiny IOVA (0x38) the moment the uplink channel really
+  * runs.  Map a scratch page over the bottom of the IOVA space so such an
+  * access lands somewhere harmless instead of taking an SMMU translation
+@@ -746,6 +763,12 @@
+ 		imem_size = mem_data->imem_size;
+ 	}
+ 
++	if (imem_addr_override) {
++		dev_info(dev, "JOAN: IMEM base %#x -> %#lx (override)\n",
++			 imem_base, imem_addr_override);
++		imem_base = imem_addr_override;
++	}
++
+ 	ipa_lowmem_init(ipa);
+ 
+ 	ret = ipa_imem_init(ipa, imem_base, imem_size);
