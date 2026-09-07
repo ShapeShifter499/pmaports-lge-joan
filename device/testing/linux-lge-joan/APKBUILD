@@ -6,8 +6,8 @@ maintainer="Lance <Gero3977@gmail.com>"
 _flavor="lge-joan"
 pkgname=linux-$_flavor
 pkgver=7.2.0_rc2
-pkgrel=9
-_commit="1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae"
+pkgrel=10
+_commit="fb968169503b4102340917c15956f533ab40be6c"
 pkgdesc="Mainline kernel for the LG V30 (joan)"
 arch="aarch64"
 _carch="arm64"
@@ -38,8 +38,6 @@ source="
 	$pkgname-$_commit.tar.gz::$url/archive/$_commit.tar.gz
 	$_config
 	0001-ipa-imem-addr-override.patch
-	0002-joan-micbias-mbhc-amic4.patch
-	0003-q6routing-selectable-tx-topology.patch
 "
 builddir="$srcdir/linux-lg-v30-joan-$_commit"
 
@@ -70,9 +68,7 @@ package() {
 }
 
 sha512sums="
-478886684c4436ee023005d0e2d90be9a47542ecce173d7e438bb761a7e3d9cb7cae52b02716733a55497d8d220fdf23a8a54bb3c9934dc260aaa68a76caac61  linux-lge-joan-1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae.tar.gz
+681f1d00aeb44c0943a00b020176d89ff738a7aafb8953593b1d3b07eb5667a18e4d255bd5927f5ec73ec791ad58a33b86fc13e21dbaa70757a76d6b67e63165  linux-lge-joan-fb968169503b4102340917c15956f533ab40be6c.tar.gz
 0dcab830782d5153f8a0e682788cbfd7cf95fea69bad318b4c703930afc2fc24e92fbb485c5b5de11a719967d036fbe68b02a3496486185bed757321eb3010f7  config-lge-joan.aarch64
 8ab31092506cd8c4529582a04bf693bac3334d10fa9e2fcc5474bc9780eee56a50a0a1c46506f5a5ba381553472d966308a3b5c3082647fa28d07700ece09359  0001-ipa-imem-addr-override.patch
-5c994ade287e41b2bbdd03087d56ac7fc625b6e0f66769cee1509325c5f6d843106b259f146f6e9da7da07d2c8f6762c5332b59883f55db32c95bedb0f921621  0002-joan-micbias-mbhc-amic4.patch
-a889e757834357f6131e29c9591705d53c13ec0e7c86e87c8b8430e02587eefa9a816fd891b63fd60ff080ccb525689a7115940287c04b68b3276a4b7484c4bd  0003-q6routing-selectable-tx-topology.patch
 "
