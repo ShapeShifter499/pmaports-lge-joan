@@ -1,0 +1,163 @@
+From c0d38d24b7f0ba92532fef00cb6432ccf647206a Mon Sep 17 00:00:00 2001
+From: Lance <Gero3977@gmail.com>
+Date: Mon, 7 Sep 2026 01:12:28 -0700
+Subject: [PATCH] ASoC: qdsp6: q6routing: make the capture COPP topology
+ selectable
+
+q6routing has always opened every COPP with NULL_COPP_TOPOLOGY.  On the
+playback path that is the right thing.  On capture it means the ADSP is
+asked for a bit-transparent chain, so none of its echo cancellation,
+noise suppression or beamforming is ever instantiated -- which is why
+mainline capture on these SoCs is raw mic and nothing else.
+
+The processing itself is not calibration data.  The ADSP builds a COPP's
+module chain from a topology definition carried in its own firmware, and
+ACDB only retunes what that chain already contains, so naming a topology
+in ADM_CMD_DEVICE_OPEN_V5 is on its own enough to instantiate the modules
+with their firmware defaults.  No ACDB parser is needed to get this far.
+
+The topology IDs added to q6adm.h were confirmed against the calibration
+data of a device that uses them rather than taken on trust: LG's ACDB for
+the msm8998 V30 contains VPM_TX_DM_FLUENCE_COPP_TOPOLOGY eight times in
+Handset_cal.acdb and VPM_TX_SM_ECNS_COPP_TOPOLOGY in Headset_cal.acdb,
+which is also a useful statement of which topology that vendor considered
+correct for which input.
+
+Which topology a board wants depends on how many mics it has and where
+they are, so this exposes it as a "TX COPP Topology" enum rather than
+guessing in the driver, and leaves the default at "None" so nothing
+changes for anyone who does not ask.  q6adm_find_matching_copp() already
+keys on topology, so switching the control opens a fresh COPP rather than
+reusing the old one.
+
+Playback is deliberately untouched and still opens NULL_COPP_TOPOLOGY.
+
+Signed-off-by: Lance <Gero3977@gmail.com>
+Assisted-by: Claude-Code:claude-opus-5
+---
+ sound/soc/qcom/qdsp6/q6adm.h     | 11 ++++++
+ sound/soc/qcom/qdsp6/q6routing.c | 68 +++++++++++++++++++++++++++++++-
+ 2 files changed, 77 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/qcom/qdsp6/q6adm.h b/sound/soc/qcom/qdsp6/q6adm.h
+index 4f56999b7fab..6c65c88857c6 100644
+--- a/sound/soc/qcom/qdsp6/q6adm.h
++++ b/sound/soc/qcom/qdsp6/q6adm.h
+@@ -7,6 +7,17 @@
+ #define MAX_COPPS_PER_PORT	8
+ #define NULL_COPP_TOPOLOGY	0x00010312
+ 
++/*
++ * ADM COPP topology IDs.  The processing chain each one names lives in the
++ * ADSP firmware; ACDB calibration only tunes it, so selecting a topology is
++ * enough to instantiate the modules with their firmware defaults.
++ */
++#define DEFAULT_COPP_TOPOLOGY			0x00010314
++#define VPM_TX_SM_ECNS_COPP_TOPOLOGY		0x00010F71
++#define VPM_TX_DM_FLUENCE_COPP_TOPOLOGY		0x00010F72
++#define VPM_TX_QMIC_FLUENCE_COPP_TOPOLOGY	0x00010F75
++#define VPM_TX_DM_RFECNS_COPP_TOPOLOGY		0x00010F86
++
+ /* multiple copp per stream. */
+ struct route_payload {
+ 	int num_copps;
+diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
+index 7386226046fa..3745c664d6f7 100644
+--- a/sound/soc/qcom/qdsp6/q6routing.c
++++ b/sound/soc/qcom/qdsp6/q6routing.c
+@@ -339,14 +339,73 @@ struct session_data {
+ 	struct q6copp *copps[MAX_COPPS_PER_PORT];
+ };
+ 
++static struct msm_routing_data *routing_data;
++
+ struct msm_routing_data {
+ 	struct session_data sessions[MAX_SESSIONS];
+ 	struct session_data port_data[AFE_MAX_PORTS];
+ 	struct device *dev;
+ 	struct mutex lock;
++	unsigned int tx_topology;
++};
++
++/*
++ * Capture-path COPP topology.
++ *
++ * The ADSP builds the processing chain for a COPP from the topology ID given
++ * in ADM_CMD_DEVICE_OPEN_V5, using definitions carried in its own firmware;
++ * ACDB calibration only retunes what that chain already contains.  Opening
++ * with NULL_COPP_TOPOLOGY, which is all this driver could ever do before,
++ * therefore gives a bit-transparent capture path with no processing at all.
++ *
++ * The other entries here name the echo-cancellation and noise-suppression
++ * chains.  Which one a device wants is a board property, so it is left to
++ * userspace (a UCM device's EnableSequence) rather than guessed here, and the
++ * default stays NULL_COPP_TOPOLOGY so behaviour is unchanged unless asked for.
++ */
++static const char * const tx_topology_text[] = {
++	"None", "SM ECNS", "DM Fluence", "QMIC Fluence", "DM RFECNS",
++};
++
++static const unsigned int tx_topology_id[] = {
++	NULL_COPP_TOPOLOGY,
++	VPM_TX_SM_ECNS_COPP_TOPOLOGY,
++	VPM_TX_DM_FLUENCE_COPP_TOPOLOGY,
++	VPM_TX_QMIC_FLUENCE_COPP_TOPOLOGY,
++	VPM_TX_DM_RFECNS_COPP_TOPOLOGY,
++};
++
++static SOC_ENUM_SINGLE_EXT_DECL(tx_topology_enum, tx_topology_text);
++
++static int msm_routing_tx_topology_get(struct snd_kcontrol *kcontrol,
++				       struct snd_ctl_elem_value *ucontrol)
++{
++	ucontrol->value.enumerated.item[0] = routing_data->tx_topology;
++
++	return 0;
++}
++
++static int msm_routing_tx_topology_put(struct snd_kcontrol *kcontrol,
++				       struct snd_ctl_elem_value *ucontrol)
++{
++	unsigned int item = ucontrol->value.enumerated.item[0];
++
++	if (item >= ARRAY_SIZE(tx_topology_id))
++		return -EINVAL;
++
++	if (routing_data->tx_topology == item)
++		return 0;
++
++	routing_data->tx_topology = item;
++
++	return 1;
++}
++
++static const struct snd_kcontrol_new msm_routing_controls[] = {
++	SOC_ENUM_EXT("TX COPP Topology", tx_topology_enum,
++		     msm_routing_tx_topology_get, msm_routing_tx_topology_put),
+ };
+ 
+-static struct msm_routing_data *routing_data;
+ 
+ /**
+  * q6routing_stream_open() - Register a new stream for route setup
+@@ -390,7 +449,10 @@ int q6routing_stream_open(int fedai_id, int perf_mode,
+ 	session->bits_per_sample = pdata->bits_per_sample;
+ 
+ 	payload.num_copps = 0; /* only RX needs to use payload */
+-	topology = NULL_COPP_TOPOLOGY;
++	if (session->path_type == ADM_PATH_LIVE_REC)
++		topology = tx_topology_id[routing_data->tx_topology];
++	else
++		topology = NULL_COPP_TOPOLOGY;
+ 	copp = q6adm_open(routing_data->dev, session->port_id,
+ 			      session->path_type, session->sample_rate,
+ 			      session->channels, topology, perf_mode,
+@@ -1120,6 +1182,8 @@ static int q6routing_reg_write(struct snd_soc_component *component,
+ static const struct snd_soc_component_driver msm_soc_routing_component = {
+ 	.probe = msm_routing_probe,
+ 	.name = DRV_NAME,
++	.controls = msm_routing_controls,
++	.num_controls = ARRAY_SIZE(msm_routing_controls),
+ 	.hw_params = routing_hw_params,
+ 	.dapm_widgets = msm_qdsp6_widgets,
+ 	.num_dapm_widgets = ARRAY_SIZE(msm_qdsp6_widgets),

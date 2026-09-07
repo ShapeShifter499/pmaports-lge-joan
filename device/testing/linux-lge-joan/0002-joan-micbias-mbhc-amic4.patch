@@ -1,4 +1,4 @@
-From c0ebbab1db20a5a6d638012eb4611118cbed83c9 Mon Sep 17 00:00:00 2001
+From 622008e1657f1c68a125f2300316c0ad8b3d4dc2 Mon Sep 17 00:00:00 2001
 From: Lance <Gero3977@gmail.com>
 Date: Mon, 7 Sep 2026 00:47:44 -0700
 Subject: [PATCH] arm64: dts: qcom: msm8998-lge-joan: fix micbias levels,
@@ -34,10 +34,15 @@ stock LG device tree out of the DTBs appended to the retail boot.img.
    analog mics, not two: LG's factory test path mictest-allmic captures
    ADC1, ADC2, ADC3 and ADC4 together, and the camcorder paths use
    ADC1+ADC3+ADC4 with the ADC1/ADC3 assignment swapped by device
-   orientation.  Deliberately still no DMIC routes -- every
-   "dmic-endfire" named path in the stock mixer_paths_tavil.xml resolves
-   to analog mics, and the one path that really does select a digital mic
-   (speaker-mic-liquid) targets Qualcomm's Liquid reference board.
+   orientation.
+
+Still no DMIC route, but the evidence is mixed rather than conclusive:
+every path LG names "*-dmic-*" selects analog mics despite the name and
+the factory all-mic test uses only the analog inputs, yet the camcorder
+paths do select DMIC0 on TX8 and the stock DTB sets
+qcom,cdc-dmic-sample-rate = <4800000>.  Both of the latter also appear in
+Qualcomm's generic 8998 configuration.  Leaving it out until something
+can be captured from it.
 
 All ten board revisions LG ships (qcom,board-id 0x308..0xf08, one
 qcom,msm-id) agree on every audio and MBHC property, so none of this is
@@ -53,11 +58,11 @@ decode all still need hardware confirmation.
 Signed-off-by: Lance <Gero3977@gmail.com>
 Assisted-by: Claude-Code:claude-opus-5
 ---
- arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts | 68 +++++++++++++++----
- 1 file changed, 54 insertions(+), 14 deletions(-)
+ arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts | 75 +++++++++++++++----
+ 1 file changed, 61 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts b/arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts
-index 07c42aa34baf..ae1eee45d3b5 100644
+index 07c42aa34baf..fdfbab50bf8e 100644
 --- a/arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts
 +++ b/arch/arm64/boot/dts/qcom/msm8998-lge-joan.dts
 @@ -1147,25 +1147,54 @@ wcd9340: codec@1,0 {
@@ -128,7 +133,7 @@ index 07c42aa34baf..ae1eee45d3b5 100644
  
  			#address-cells = <1>;
  			#size-cells = <1>;
-@@ -1275,11 +1304,22 @@ sound {
+@@ -1275,11 +1304,29 @@ sound {
  		 * SND_SOC_DAPM_OUTPUT endpoints and need no board route to be
  		 * usable; they are reached by the RX INTn chain kcontrols.
  		 */
@@ -136,11 +141,18 @@ index 07c42aa34baf..ae1eee45d3b5 100644
 +		 * joan has three built-in analog mics plus the headset mic; LG's
 +		 * own factory test path ("mictest-allmic" in the stock
 +		 * mixer_paths_tavil.xml) captures ADC1, ADC2, ADC3 and ADC4
-+		 * together, and the camcorder paths use ADC1+ADC3+ADC4.  Every
-+		 * "dmic-endfire" named path in that file resolves to analog mics
-+		 * as well, so no digital mic is populated on this board and no
-+		 * DMIC route belongs here.  AMIC4 reaches ADC4 through the
-+		 * codec's AMIC4_5 SEL mux.
++		 * together, and the camcorder paths use ADC1+ADC3+ADC4.  AMIC4
++		 * reaches ADC4 through the codec's AMIC4_5 SEL mux.
++		 *
++		 * No DMIC route is added.  Every path LG names "*-dmic-*"
++		 * selects analog mics despite the name, and the factory all-mic
++		 * test -- which one would expect to exercise every fitted mic --
++		 * uses only the four analog inputs.  Against that, the camcorder
++		 * paths do select DMIC0 on TX8, and qcom,cdc-dmic-sample-rate is
++		 * set to 4800000 in the stock DTB, so a digital mic cannot be
++		 * ruled out; both of those also appear in Qualcomm's generic
++		 * 8998 configuration, which is the likelier explanation.  Left
++		 * out until something can actually be captured from it.
 +		 */
  		audio-routing =
  			"RX_BIAS", "MCLK",
