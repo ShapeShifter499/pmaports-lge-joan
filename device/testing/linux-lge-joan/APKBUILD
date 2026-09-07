@@ -6,7 +6,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 _flavor="lge-joan"
 pkgname=linux-$_flavor
 pkgver=7.2.0_rc2
-pkgrel=10
+pkgrel=11
 _commit="fb968169503b4102340917c15956f533ab40be6c"
 pkgdesc="Mainline kernel for the LG V30 (joan)"
 arch="aarch64"
@@ -38,6 +38,7 @@ source="
 	$pkgname-$_commit.tar.gz::$url/archive/$_commit.tar.gz
 	$_config
 	0001-ipa-imem-addr-override.patch
+	0004-dpu-first-kickoff-te-gate.patch
 "
 builddir="$srcdir/linux-lg-v30-joan-$_commit"
 
@@ -71,4 +72,5 @@ sha512sums="
 681f1d00aeb44c0943a00b020176d89ff738a7aafb8953593b1d3b07eb5667a18e4d255bd5927f5ec73ec791ad58a33b86fc13e21dbaa70757a76d6b67e63165  linux-lge-joan-fb968169503b4102340917c15956f533ab40be6c.tar.gz
 0dcab830782d5153f8a0e682788cbfd7cf95fea69bad318b4c703930afc2fc24e92fbb485c5b5de11a719967d036fbe68b02a3496486185bed757321eb3010f7  config-lge-joan.aarch64
 8ab31092506cd8c4529582a04bf693bac3334d10fa9e2fcc5474bc9780eee56a50a0a1c46506f5a5ba381553472d966308a3b5c3082647fa28d07700ece09359  0001-ipa-imem-addr-override.patch
+b13fea03b136c9133220b5f0620ba8b42771f9e1375d3acaf6d4092dd2f3054794f2a1dbd8072200aa34607a2e1478dbf83b544d78c791a7e1005ee4ca8fcf15  0004-dpu-first-kickoff-te-gate.patch
 "

@@ -1,0 +1,118 @@
+From 2f1308c271d8e9e2bd079eb0ba55d05c5298313f Mon Sep 17 00:00:00 2001
+From: Lance <Gero3977@gmail.com>
+Date: Tue, 4 Aug 2026 05:27:05 -0700
+Subject: [PATCH] drm/msm/dpu: gate first kickoff after wake on one TE edge
+
+The wake-transition rainbow garbage on the LG V30 (sw43402) persisted
+through six candidates (A185 ELVSS off-prep, A186 post-display-on
+settle, A187 continuous clock lane which regressed wake, A188
+invalidated, A189 TE re-arm, A190 host PHY PLL-restore settle); the
+panel prepare sequence is byte-faithful to downstream and the host
+PHY/PLL timing path is exhausted. This is the last untested dimension:
+the first command-mode kickoff after a blank -> unblank wake can be
+sent before the panel's scan-out/TE has re-established, so the first
+frame lands mid-scan and shows as transient garbage until the next
+frame decodes cleanly.
+
+Gate the first kickoff after each enable transition on one TE
+(read-pointer) edge: mark first_kickoff_after_enable in
+dpu_encoder_phys_cmd_enable(), then in prepare_for_kickoff set the
+pending read-pointer counter and wait on the existing pending_vblank_wq
+with the standard kickoff timeout. The wait is bounded and fail-open
+(if no TE edge arrives, log and proceed so wake never wedges), guarded
+to the master encoder with a live vblank/read-pointer callback.
+
+This is the only behavioral change from the A186-tested tree (the
+rejected A190 PHY settle is not included); DTB and config are
+byte-identical.
+
+Signed-off-by: Lance <Gero3977@gmail.com>
+Assisted-by: Hermes-Agent:openai-codex/gpt-5.6-sol
+---
+ .../gpu/drm/msm/disp/dpu1/dpu_encoder_phys.h  | 10 +++++
+ .../drm/msm/disp/dpu1/dpu_encoder_phys_cmd.c  | 41 +++++++++++++++++++
+ 2 files changed, 51 insertions(+)
+
+diff --git a/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys.h b/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys.h
+index 61b22d949454..d250746b5496 100644
+--- a/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys.h
++++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys.h
+@@ -246,6 +246,16 @@ struct dpu_encoder_phys_cmd {
+ 	int pp_timeout_report_cnt;
+ 	atomic_t pending_vblank_cnt;
+ 	wait_queue_head_t pending_vblank_wq;
++
++	/*
++	 * Set when the encoder transitions to enabled (including every
++	 * blank -> unblank wake). On the first kickoff after that
++	 * transition, the encoder waits for one TE (read-pointer) edge so
++	 * the first command-mode frame lands after the panel's scan-out
++	 * has re-established; without this the first frame can tear and
++	 * show as transient garbage on the wake transition.
++	 */
++	bool first_kickoff_after_enable;
+ };
+ 
+ /**
+diff --git a/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_cmd.c b/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_cmd.c
+index 45079ee59cf6..cc05db72ee5c 100644
+--- a/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_cmd.c
++++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_cmd.c
+@@ -486,6 +486,13 @@ static void dpu_encoder_phys_cmd_enable(struct dpu_encoder_phys *phys_enc)
+ 
+ 	dpu_encoder_phys_cmd_enable_helper(phys_enc);
+ 	phys_enc->enable_state = DPU_ENC_ENABLED;
++
++	/*
++	 * Mark that the next kickoff is the first after this enable
++	 * transition (including every blank -> unblank wake) so it waits
++	 * for one TE edge before sending the first frame.
++	 */
++	cmd_enc->first_kickoff_after_enable = true;
+ }
+ 
+ static void _dpu_encoder_phys_cmd_connect_te(
+@@ -608,6 +615,40 @@ static void dpu_encoder_phys_cmd_prepare_for_kickoff(
+ 
+ 	dpu_encoder_phys_cmd_enable_te(phys_enc);
+ 
++	/*
++	 * First kickoff after an enable/wake transition: wait for one TE
++	 * (read-pointer) edge before sending the first frame. On blank ->
++	 * unblank the panel's scan-out and TE re-establish while the first
++	 * command-mode frame is being prepared; if it is kicked before the
++	 * first TE edge, the panel receives it mid-scan and shows transient
++	 * garbage (owner-visible "rainbow" on the LG V30 sw43402 wake
++	 * transition) until the next frame lands cleanly.
++	 *
++	 * The TE IRQ is only live on the master encoder, and only when the
++	 * vblank/read-pointer callback is registered (vblank_refcount > 0);
++	 * guard on both. The wait is bounded and fail-open: if no TE edge
++	 * arrives (e.g. the panel is idle), log once and proceed rather than
++	 * wedging the wake path.
++	 */
++	if (cmd_enc->first_kickoff_after_enable) {
++		cmd_enc->first_kickoff_after_enable = false;
++
++		if (dpu_encoder_phys_cmd_is_master(phys_enc) &&
++		    phys_enc->vblank_refcount > 0 &&
++		    phys_enc->irq[INTR_IDX_RDPTR]) {
++			atomic_set(&cmd_enc->pending_vblank_cnt, 1);
++			ret = wait_event_timeout(cmd_enc->pending_vblank_wq,
++					!atomic_read(&cmd_enc->pending_vblank_cnt),
++					KICKOFF_TIMEOUT_JIFFIES);
++			if (!ret)
++				DPU_ERROR_CMDENC(cmd_enc,
++					"first kickoff TE wait timed out, proceeding\n");
++			else
++				DPU_DEBUG_CMDENC(cmd_enc,
++					"first kickoff gated on TE edge\n");
++		}
++	}
++
+ 	DPU_DEBUG_CMDENC(cmd_enc, "pp:%d pending_cnt %d\n",
+ 			phys_enc->hw_pp->idx - PINGPONG_0,
+ 			atomic_read(&phys_enc->pending_kickoff_cnt));
+-- 
+2.55.0
+
