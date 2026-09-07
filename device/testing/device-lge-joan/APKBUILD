@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=6
+pkgrel=7
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -21,7 +21,9 @@ depends="
 	soc-qcom
 "
 makedepends="devicepkg-dev"
-source="deviceinfo"
+source="deviceinfo
+	phosh-start-timeout.conf
+	"
 
 build() {
 	devicepkg_build $startdir $pkgname
@@ -29,8 +31,13 @@ build() {
 
 package() {
 	devicepkg_package $startdir $pkgname
+
+	# Raise Phosh's start timeout; the file's header records the measurement.
+	install -Dm644 "$srcdir"/phosh-start-timeout.conf \
+		"$pkgdir"/usr/lib/systemd/user/mobi.phosh.Shell.service.d/10-phosh-start-timeout.conf
 }
 
 sha512sums="
 702d64e6107c5c9f9e17eac5a590f22387503747f10e361c107750b4a0f0c2ba89c3fddaf7f66a261cf960c67aa98669330cb42785c8a61b77206d438ed79a98  deviceinfo
+4ac81d5bd50abadd9e123d115d2ab633243cb7c72336d14ef884523fbf20f3ab56bd0722163bd2e080ba4036daf6ea27f13ec3d6515adf847fda2edccd362fa5  phosh-start-timeout.conf
 "

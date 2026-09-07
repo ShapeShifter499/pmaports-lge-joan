@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan-h932
 pkgdesc="LG V30, T-Mobile H932 only (differently signed firmware)"
 pkgver=1
-pkgrel=2
+pkgrel=3
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -21,7 +21,9 @@ depends="
 	soc-qcom
 "
 makedepends="devicepkg-dev"
-source="deviceinfo"
+source="deviceinfo
+	phosh-start-timeout.conf
+	"
 
 build() {
 	devicepkg_build $startdir $pkgname
@@ -29,8 +31,13 @@ build() {
 
 package() {
 	devicepkg_package $startdir $pkgname
+
+	# Raise Phosh's start timeout; the file's header records the measurement.
+	install -Dm644 "$srcdir"/phosh-start-timeout.conf \
+		"$pkgdir"/usr/lib/systemd/user/mobi.phosh.Shell.service.d/10-phosh-start-timeout.conf
 }
 
 sha512sums="
 8a77160fc5ef5335e128557dc967145b45861d7d19a4ee99293dd152ac00d7944e68444033ccd60e9e35ee5e3fe2e9ac325d963fb1f99a6a8fb5f698308eac7e  deviceinfo
+4ac81d5bd50abadd9e123d115d2ab633243cb7c72336d14ef884523fbf20f3ab56bd0722163bd2e080ba4036daf6ea27f13ec3d6515adf847fda2edccd362fa5  phosh-start-timeout.conf
 "
