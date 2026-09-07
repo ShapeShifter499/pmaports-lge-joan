@@ -6,7 +6,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 _flavor="lge-joan"
 pkgname=linux-$_flavor
 pkgver=7.2.0_rc2
-pkgrel=7
+pkgrel=8
 _commit="1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae"
 pkgdesc="Mainline kernel for the LG V30 (joan)"
 arch="aarch64"
@@ -38,6 +38,7 @@ source="
 	$pkgname-$_commit.tar.gz::$url/archive/$_commit.tar.gz
 	$_config
 	0001-ipa-imem-addr-override.patch
+	0002-joan-micbias-mbhc-amic4.patch
 "
 builddir="$srcdir/linux-lg-v30-joan-$_commit"
 
@@ -71,4 +72,5 @@ sha512sums="
 478886684c4436ee023005d0e2d90be9a47542ecce173d7e438bb761a7e3d9cb7cae52b02716733a55497d8d220fdf23a8a54bb3c9934dc260aaa68a76caac61  linux-lge-joan-1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae.tar.gz
 0dcab830782d5153f8a0e682788cbfd7cf95fea69bad318b4c703930afc2fc24e92fbb485c5b5de11a719967d036fbe68b02a3496486185bed757321eb3010f7  config-lge-joan.aarch64
 8ab31092506cd8c4529582a04bf693bac3334d10fa9e2fcc5474bc9780eee56a50a0a1c46506f5a5ba381553472d966308a3b5c3082647fa28d07700ece09359  0001-ipa-imem-addr-override.patch
+364a5f07e95baae263fe9812eec2b573ce4a47abc7095308a0947930c4a5602e79419ed96465d37f5df5b8792e6d94410f4534d5df2260ea27939240228f2e46  0002-joan-micbias-mbhc-amic4.patch
 "
