@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=8
+pkgrel=9
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -38,6 +38,6 @@ package() {
 }
 
 sha512sums="
-5e8586c6d70acd1c2d6036f057962e4ec92c3eacfe9f9e2daf8907ef76383eaefa7693dd0d02e8ef3b5e11046519d43584ce7e712eb9d2be57603c1c2f8ec727  deviceinfo
+edd2b17d646ec797afe955b0ef60c9282b7df46fe107f9e926c4b5b873f17dd2f867b10388adc4d6859c1aedaa163f7988954ca591a79eae3b497927b9073ae2  deviceinfo
 4ac81d5bd50abadd9e123d115d2ab633243cb7c72336d14ef884523fbf20f3ab56bd0722163bd2e080ba4036daf6ea27f13ec3d6515adf847fda2edccd362fa5  phosh-start-timeout.conf
 "

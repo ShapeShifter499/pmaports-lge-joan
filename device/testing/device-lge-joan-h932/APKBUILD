@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan-h932
 pkgdesc="LG V30, T-Mobile H932 only (differently signed firmware)"
 pkgver=1
-pkgrel=4
+pkgrel=5
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -38,6 +38,6 @@ package() {
 }
 
 sha512sums="
-0c0d231ab2dac800ceb02141038f175c0f125841cbf187d258f8fdface6126b595206003225fdbfd5fbc70e484d4dbfc499e9c91fc3668970e97135f33ccc140  deviceinfo
+ea7475f8b24930ff89db2c31aa146e853c89bb15f48e162ef10c83e7bb0218bce52eb12cb92ca5393394bd55f8c90303fa635ac0e58f92429f36c102c4daf037  deviceinfo
 4ac81d5bd50abadd9e123d115d2ab633243cb7c72336d14ef884523fbf20f3ab56bd0722163bd2e080ba4036daf6ea27f13ec3d6515adf847fda2edccd362fa5  phosh-start-timeout.conf
 "
