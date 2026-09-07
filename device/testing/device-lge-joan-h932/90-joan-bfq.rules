@@ -1,0 +1,13 @@
+# Use BFQ for SD/MMC storage on joan.
+#
+# The SD-card install flavour runs the whole rootfs from a microSD card
+# (SDR104), not from the phone's UFS. Downstream Android ran cfq against UFS on
+# the legacy block layer; the modern blk-mq equivalent for slow, high-latency,
+# shallow-queue media is BFQ, which is markedly better than mq-deadline for
+# interactive desktop workloads -- session startup on Phosh is dominated by
+# small random reads (icon caches, GSettings, fontconfig, shared libraries),
+# which is exactly BFQ's case.
+#
+# UFS/eMMC internal storage keeps the kernel default; only removable MMC is
+# retargeted here.
+ACTION=="add|change", KERNEL=="mmcblk[0-9]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="bfq"

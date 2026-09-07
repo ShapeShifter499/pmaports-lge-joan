@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan-h932
 pkgdesc="LG V30, T-Mobile H932 only (differently signed firmware)"
 pkgver=1
-pkgrel=6
+pkgrel=7
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -27,6 +27,7 @@ depends="
 makedepends="devicepkg-dev"
 source="deviceinfo
 	phosh-start-timeout.conf
+	90-joan-bfq.rules
 	"
 
 build() {
@@ -39,9 +40,14 @@ package() {
 	# Raise Phosh's start timeout; the file's header records the measurement.
 	install -Dm644 "$srcdir"/phosh-start-timeout.conf \
 		"$pkgdir"/usr/lib/systemd/user/mobi.phosh.Shell.service.d/10-phosh-start-timeout.conf
+
+	# BFQ for the microSD the SD-flavour rootfs lives on
+	install -Dm644 "$srcdir"/90-joan-bfq.rules \
+		"$pkgdir"/usr/lib/udev/rules.d/90-joan-bfq.rules
 }
 
 sha512sums="
-ea7475f8b24930ff89db2c31aa146e853c89bb15f48e162ef10c83e7bb0218bce52eb12cb92ca5393394bd55f8c90303fa635ac0e58f92429f36c102c4daf037  deviceinfo
+60e3c975cda8e7c8d256cf40878235f218a55ae5874aff187b1077ebb26255da5baf9aecb8c5c5261ac462c859f53385405f6fa97e84b4c09ccdc54db3efce1f  deviceinfo
 4ac81d5bd50abadd9e123d115d2ab633243cb7c72336d14ef884523fbf20f3ab56bd0722163bd2e080ba4036daf6ea27f13ec3d6515adf847fda2edccd362fa5  phosh-start-timeout.conf
+ce6ea306df8497e229cb598eff1dc9c29777900583aad7f46ac878bc00b46fcca16097e7673708639356f8b98fec6ff393623a8ab2ef6e765fb03be9767b4430  90-joan-bfq.rules
 "
