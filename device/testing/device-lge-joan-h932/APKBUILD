@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan-h932
 pkgdesc="LG V30, T-Mobile H932 only (differently signed firmware)"
 pkgver=1
-pkgrel=5
+pkgrel=6
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -17,8 +17,12 @@ depends="
 	lge-joan-volte
 	linux-lge-joan
 	mkbootimg
+	pipewire-alsa
+	pipewire-pulse
 	postmarketos-base
+	postmarketos-base-ui-audio-backend-pipewire
 	soc-qcom
+	wireplumber
 "
 makedepends="devicepkg-dev"
 source="deviceinfo

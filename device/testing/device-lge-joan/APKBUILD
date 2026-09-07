@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=9
+pkgrel=10
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -17,8 +17,12 @@ depends="
 	lge-joan-volte
 	linux-lge-joan
 	mkbootimg
+	pipewire-alsa
+	pipewire-pulse
 	postmarketos-base
+	postmarketos-base-ui-audio-backend-pipewire
 	soc-qcom
+	wireplumber
 "
 makedepends="devicepkg-dev"
 source="deviceinfo
