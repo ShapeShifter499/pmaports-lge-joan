@@ -26,7 +26,7 @@ deviceinfo_flash_offset_tags="0x00000100"
 deviceinfo_flash_pagesize="4096"
 
 # Mainline kernel options
-deviceinfo_kernel_cmdline="panic=5 pmos.force-partition-resize"
+deviceinfo_kernel_cmdline="panic=5 pmos.force-partition-resize slim_qcom_ngd_ctrl.slim_dbg=0"
 deviceinfo_dtb="qcom/msm8998-lge-joan"
 deviceinfo_append_dtb="true"
 
@@ -37,3 +37,4 @@ deviceinfo_append_dtb="true"
 deviceinfo_usb_idVendor="0x1d6b"
 deviceinfo_usb_idProduct="0x0104"
 deviceinfo_usb_serialnumber="lge-joan-h932"
+deviceinfo_flash_fastboot_partition_kernel="laf"
