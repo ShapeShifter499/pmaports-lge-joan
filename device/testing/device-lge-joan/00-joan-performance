@@ -1,0 +1,11 @@
+# TEMPORARY stopgap — remove when the real rendering fix lands.
+# The phosh shell is CPU-bound in GTK3 (Cairo, no GL) at 1440x2880; disabling
+# animations was measured at 2080 -> 490 lockscreen jiffies on this device
+# (docs/ember-handoff-2026-08-07-bimc-qos-closed.md).
+#
+# Remove this file when EITHER:
+#   - phosh/GTK4 ships (GL-accelerated shell, NLnet port in progress), or
+#   - the phoc "scale = 2" + GDK_SCALE=1 experiment is proven and adopted.
+# Real fix tracked in lg-v30-port docs/2026-09-11-performance-vs-lineageos-report.md.
+[org/gnome/desktop/interface]
+enable-animations=false
