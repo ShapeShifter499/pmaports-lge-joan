@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=13
+pkgrel=14
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -20,6 +20,7 @@ depends="
 	pipewire-alsa
 	pipewire-echo-cancel
 	pipewire-pulse
+	postmarketos-usb-moded-default-profile-developer
 	postmarketos-base
 	postmarketos-base-ui-audio-backend-pipewire
 	soc-qcom
@@ -28,6 +29,10 @@ depends="
 makedepends="devicepkg-dev"
 source="deviceinfo
 	50-joan-echo-cancel.conf
+	joan-input-boost
+	joan-input-boost.service
+	joan-lock-scale
+	joan-lock-scale.service
 	phosh-start-timeout.conf
 	90-joan-bfq.rules
 	joan-dconf-profile
@@ -50,6 +55,24 @@ package() {
 		"$pkgdir"/usr/lib/udev/rules.d/90-joan-bfq.rules
 
 	# WebRTC noise suppression / echo cancellation on the mic
+	# Input boost: brief big-cluster CPU floor on touch (downstream
+	# cpu-boost.c behaviour, userspace edition).
+	install -Dm755 "$srcdir"/joan-input-boost \
+		"$pkgdir"/usr/libexec/joan-input-boost
+	install -Dm644 "$srcdir"/joan-input-boost.service \
+		"$pkgdir"/usr/lib/systemd/system/joan-input-boost.service
+	ln -s /usr/lib/systemd/system/joan-input-boost.service \
+		"$pkgdir"/etc/systemd/system/multi-user.target.wants/joan-input-boost.service
+
+	# Lock-gated display scale: scale 2 while locked, native when unlocked.
+	install -Dm755 "$srcdir"/joan-lock-scale \
+		"$pkgdir"/usr/libexec/joan-lock-scale
+	install -Dm644 "$srcdir"/joan-lock-scale.service \
+		"$pkgdir"/usr/lib/systemd/user/joan-lock-scale.service
+	mkdir -p "$pkgdir"/etc/systemd/user/graphical-session.target.wants
+	ln -s /usr/lib/systemd/user/joan-lock-scale.service \
+		"$pkgdir"/etc/systemd/user/graphical-session.target.wants/joan-lock-scale.service
+
 	install -Dm644 "$srcdir"/50-joan-echo-cancel.conf \
 		"$pkgdir"/usr/share/pipewire/pipewire.conf.d/50-joan-echo-cancel.conf
 }
@@ -57,6 +80,12 @@ package() {
 sha512sums="
 2ae0c58a0d979b50e62e445545d6b548fb9138c74124454e207b61fa81102b38e7ebd14e5715aac9584cdbe46c1544feef6c5a884fe33adca3016fa635373775  deviceinfo
 e541a5c9127ef86c9ebde27744c2f483004ba54731ad31f2326550b81105a727a46855c2f4faeb94a6bea3c7cb2bd551264fa8c787417311dab1ef9e620c4d1a  50-joan-echo-cancel.conf
+7965425f6f1526bc2f09c8cc306ccd422713b9d210595fd8800cb5a2c75217a1a2b995bbbb10b0fc57048c1428193ddcf529bba5ae6e093113a3f961d37c0202  joan-input-boost
+1c440dfb0ac82fdb100a5d46e5bfddc251a8412e9a8449fe636c3d1a105716c87e1346afa6feaf794a3c899ccdd98e21b307266b9bdabf0be6d02f2e7b1b1a23  joan-input-boost.service
+0576c0897d3554b69b927c84c6841c0f06497e273f3b6efce802719cbc6e9c9455d087d963fbc30aaf8564b923905f50bca0c0c0a1e6659986ee242e6b4bcd55  joan-lock-scale
+ab2f4f75d34677222d39b7dd79229143fd1c65e613bf71773368d004a74e6a15cddbcca42a81a073c0b9c2ff5733ec15659f7557d561167e5a9e25d85052f7ee  joan-lock-scale.service
 4ac81d5bd50abadd9e123d115d2ab633243cb7c72336d14ef884523fbf20f3ab56bd0722163bd2e080ba4036daf6ea27f13ec3d6515adf847fda2edccd362fa5  phosh-start-timeout.conf
 ce6ea306df8497e229cb598eff1dc9c29777900583aad7f46ac878bc00b46fcca16097e7673708639356f8b98fec6ff393623a8ab2ef6e765fb03be9767b4430  90-joan-bfq.rules
+6e23b525531b94e6b40f2118570b7e162b3e41a4a2c33f99b1a1cba5fa9e65f53048c382c6fd1196a6421ab4c40206dc995a726ac157480b85623ab4164418ad  joan-dconf-profile
+f85c89c67727bb8ed01c80b21466527c371a280a70a9a6fb336b52219e0239232b55e97fdc8a6964f0849f81ee9cbea759c2c6a6d26d8f31eb64acd4ccf0af5e  00-joan-performance
 "

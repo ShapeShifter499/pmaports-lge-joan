@@ -1,0 +1,12 @@
+[Unit]
+Description=joan input boost (brief CPU floor on touch)
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/joan-input-boost
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

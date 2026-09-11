@@ -1,0 +1,13 @@
+[Unit]
+Description=joan lock-gated display scale (CPU-bound lockscreen relief)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/joan-lock-scale
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""Input boost: briefly raise the CPU floor on touch, like downstream's
+cpu-boost.c.  Reads the touchscreen's evdev node directly (no extra deps);
+any event sets a min-freq floor on the big cluster for BOOST_MS, then
+restores the previous floor.  stdlib only; runs as a system service."""
+import glob
+import os
+import select
+import struct
+import time
+
+BOOST_MS = 40
+BOOST_MIN = 1497600          # big-cluster floor during boost (kHz*Hz)
+POLICIES = ["/sys/devices/system/cpu/cpufreq/policy4"]
+
+# find the touchscreen: stmfts/FTS3670 exposes ABS_MT events
+def find_touch():
+    for path in sorted(glob.glob("/dev/input/event*")):
+        name = None
+        try:
+            with open(f"/sys/class/input/{os.path.basename(path)}/device/name") as f:
+                name = f.read().strip()
+        except OSError:
+            continue
+        if name and ("fts" in name.lower() or "stm" in name.lower()):
+            return path
+    return None
+
+def read_floor(policy):
+    try:
+        with open(os.path.join(policy, "scaling_min_freq")) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+def write_floor(policy, val):
+    try:
+        with open(os.path.join(policy, "scaling_min_freq"), "w") as f:
+            f.write(val)
+    except OSError:
+        pass
+
+def main():
+    dev = find_touch()
+    if not dev:
+        return
+    fd = os.open(dev, os.O_RDONLY | os.O_NONBLOCK)
+    floors = {p: read_floor(p) for p in POLICIES}
+    boosted_until = 0.0
+    fmt = "llHHi"
+    while True:
+        data = os.read(fd, 1024)
+        if data:
+            boosted_until = time.monotonic() + BOOST_MS / 1000.0
+            for p in POLICIES:
+                write_floor(p, str(BOOST_MIN))
+        # restore after the window
+        if boosted_until and time.monotonic() > boosted_until:
+            for p, old in floors.items():
+                if old:
+                    write_floor(p, old)
+            boosted_until = 0.0
+        select.select([fd], [], [], 0.05 if not data else 0.005)
+
+if __name__ == "__main__":
+    main()
