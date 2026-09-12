@@ -4,9 +4,10 @@
 # forced built-in)
 maintainer="Lance <Gero3977@gmail.com>"
 _flavor="lge-joan"
+_dtb="qcom/msm8998-lge-joan"   # must match deviceinfo_dtb
 pkgname=linux-$_flavor
 pkgver=7.2.0_rc2
-pkgrel=16
+pkgrel=17
 _commit="ff98974a67aa05e258007b44a09f0897595df960"
 pkgdesc="Mainline kernel for the LG V30 (joan)"
 arch="aarch64"
@@ -55,12 +56,19 @@ build() {
 package() {
 	mkdir -p "$pkgdir/boot"
 
-	make zinstall modules_install dtbs_install \
+	make zinstall modules_install \
 		ARCH="$_carch" \
 		INSTALL_PATH="$pkgdir/boot" \
 		INSTALL_MOD_PATH="$pkgdir" \
-		INSTALL_MOD_STRIP=1 \
-		INSTALL_DTBS_PATH="$pkgdir/boot/dtbs"
+		INSTALL_MOD_STRIP=1
+
+	# Only joan's DTB, not dtbs_install's whole arm64 set.  The boot
+	# partition is 226 MiB and dtbs_install writes 1841 files into it,
+	# which leaves too little headroom to stage an upgrade's new copies
+	# alongside the old ones: apk then fails mid-transaction with
+	# "No space left on device" and the package is left unchanged.
+	install -Dm644 "$builddir/arch/$_carch/boot/dts/${_dtb}.dtb" \
+		"$pkgdir/boot/dtbs/${_dtb}.dtb"
 	rm -f "$pkgdir"/lib/modules/*/build "$pkgdir"/lib/modules/*/source
 
 	install -D "$builddir/include/config/kernel.release" \
