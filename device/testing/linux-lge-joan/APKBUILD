@@ -38,7 +38,6 @@ makedepends="
 source="
 	$pkgname-$_commit.tar.gz::$url/archive/$_commit.tar.gz
 	$_config
-	0001-ipa-imem-addr-override.patch
 "
 builddir="$srcdir/linux-lg-v30-joan-$_commit"
 
@@ -78,5 +77,4 @@ package() {
 sha512sums="
 911ac60fb16011ed77bdd94db9f27d2eb3c624861e40dd62dc357f53f17fb9b77f798f395f75e0ab25dc83352b6d3424cbc24d44782ccae60f92f325881be762  linux-lge-joan-f64cdaaf0e60878eca9d57d290a53e9ea96062cb.tar.gz
 62aa76142595a6bec7cc36113068c91efe45b78cb4773956e177726232175f7bb01073607aab2181a418ca9fbeb084fe2f6bcb2dfdea81c8bd750fd66bffdc89  config-lge-joan.aarch64
-8ab31092506cd8c4529582a04bf693bac3334d10fa9e2fcc5474bc9780eee56a50a0a1c46506f5a5ba381553472d966308a3b5c3082647fa28d07700ece09359  0001-ipa-imem-addr-override.patch
 "
