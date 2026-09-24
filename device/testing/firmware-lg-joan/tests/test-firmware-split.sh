@@ -8,18 +8,18 @@ set -eu
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 selector=$repo_dir/joan-firmware-variant
 apkbuild=$repo_dir/APKBUILD
-files=$repo_dir/30-lge-joan-gpu.files
+files=$repo_dir/30-lg-joan-gpu.files
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 sh -n "$selector"
-sh -n "$repo_dir/firmware-lge-joan-h930.post-install"
-sh -n "$repo_dir/firmware-lge-joan-h932.post-install"
+sh -n "$repo_dir/firmware-lg-joan-h930.post-install"
+sh -n "$repo_dir/firmware-lg-joan-h932.post-install"
 
-grep -q 'owner-firmware-lge-joan' "$apkbuild" && \
-	fail "APKBUILD still references owner-firmware-lge-joan"
-grep -q 'firmware-lge-joan-blobs' "$apkbuild" || \
-	fail "APKBUILD does not fetch firmware-lge-joan-blobs"
+grep -q 'owner-firmware-lg-joan' "$apkbuild" && \
+	fail "APKBUILD still references owner-firmware-lg-joan"
+grep -q 'firmware-lg-joan-blobs' "$apkbuild" || \
+	fail "APKBUILD does not fetch firmware-lg-joan-blobs"
 grep -q 'pkgname-h930:h930' "$apkbuild" || fail "missing h930 subpackage"
 grep -q 'pkgname-h932:h932' "$apkbuild" || fail "missing h932 subpackage"
 

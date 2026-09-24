@@ -1,6 +1,6 @@
 # Binaries never belong in pmaports. The APKBUILD fetches
-# firmware-lge-joan-blobs at the pinned commit.
-owner-firmware-lge-joan.tar
+# firmware-lg-joan-blobs at the pinned commit.
+owner-firmware-lg-joan.tar
 a540_gpmu.fw2
 a540_zap.mdt
 a540_zap.b00

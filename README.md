@@ -1,18 +1,18 @@
 # pmaports — LG V30 (joan) fork
 
 A fork of [postmarketOS pmaports](https://gitlab.postmarketos.org/postmarketOS/pmaports)
-carrying the device and kernel packages for the **LG V30** (`lge-joan`, msm8998)
+carrying the device and kernel packages for the **LG V30** (`lg-joan`, msm8998)
 mainline port. Upstream's own README follows below.
 
 | package | what it is |
 |---|---|
-| `device/testing/device-lge-joan` | H930, US998, H932PR and every other non-H932 — depends on `firmware-lge-joan-h930` |
-| `device/testing/device-lge-joan-h932` | exact T-Mobile H932 only — depends on `firmware-lge-joan-h932` |
-| `device/testing/linux-lge-joan` | mainline kernel, pinned to a commit of [`ShapeShifter499/linux-lg-v30-joan`](https://github.com/ShapeShifter499/linux-lg-v30-joan) |
-| `device/testing/firmware-lge-joan` | text-only recipe: shared GPU/BT plus `-h930` / `-h932`. Fetches [`firmware-lge-joan-blobs`](https://github.com/ShapeShifter499/firmware-lge-joan-blobs) at a commit pin. **No owner tarball, no copy-in.** |
-| `device/testing/alsa-ucm-conf-lge-joan` | ALSA UCM so PipeWire sees the jack instead of dummy output |
+| `device/testing/device-lg-joan` | H930, US998, H932PR and every other non-H932 — depends on `firmware-lg-joan-h930` |
+| `device/testing/device-lg-joan-h932` | exact T-Mobile H932 only — depends on `firmware-lg-joan-h932` |
+| `device/testing/linux-lg-joan` | mainline kernel, pinned to a commit of [`ShapeShifter499/linux-lg-v30-joan`](https://github.com/ShapeShifter499/linux-lg-v30-joan) |
+| `device/testing/firmware-lg-joan` | text-only recipe: shared GPU/BT plus `-h930` / `-h932`. Fetches [`firmware-lg-joan-blobs`](https://github.com/ShapeShifter499/firmware-lg-joan-blobs) at a commit pin. **No owner tarball, no copy-in.** |
+| `device/testing/alsa-ucm-conf-lg-joan` | ALSA UCM so PipeWire sees the jack instead of dummy output |
 | `device/testing/joan-imsd` | 3GPP IMS SIP UA (VoLTE). systemd unit + CLI `joan-ims dial`; per-message transport criterion and carrier-profile layer ported from the LineageOS findings |
-| `device/testing/lge-joan-volte` | first-boot metapackage: MM + 81voltd + rmtfs + calls + joan-imsd; the `-systemd` subpackage ships only the joan preset and uses Alpine's own `rmtfs-systemd` / `81voltd-systemd` units |
+| `device/testing/lg-joan-volte` | first-boot metapackage: MM + 81voltd + rmtfs + calls + joan-imsd; the `-systemd` subpackage ships only the joan preset and uses Alpine's own `rmtfs-systemd` / `81voltd-systemd` units |
 
 Everything else in this tree is unmodified upstream pmaports. The GPU/display
 enablement lives in that kernel pin, not as a carried patch series here.
@@ -22,7 +22,7 @@ enablement lives in that kernel pin, not as a carried patch series here.
 This tree is self-contained for a first image. The kernel tarball, firmware
 **recipe**, ALSA UCM profile, and VoLTE stack are in-tree. Proprietary firmware
 blobs are fetched at build time from the commit pin in
-`firmware-lge-joan/APKBUILD`. There is **no** `owner-firmware-lge-joan.tar`
+`firmware-lg-joan/APKBUILD`. There is **no** `owner-firmware-lg-joan.tar`
 to prepare and **no** extra clone/copy.
 
 You need pmbootstrap, roughly 25 GB of free space for the kernel build, and a
@@ -93,16 +93,16 @@ pmbootstrap config aports "$PWD/pmaports-lge-joan"
 
 It is stored in `~/.config/pmbootstrap_v3.cfg`.
 
-`joan` pulls `firmware-lge-joan-h930`; `joan-h932` pulls
-`firmware-lge-joan-h932`. Do not install both. The firmware recipe is already
+`joan` pulls `firmware-lg-joan-h930`; `joan-h932` pulls
+`firmware-lg-joan-h932`. Do not install both. The firmware recipe is already
 in this tree; `pmbootstrap install` fetches
-[`firmware-lge-joan-blobs`](https://github.com/ShapeShifter499/firmware-lge-joan-blobs)
-itself. Do **not** copy `ShapeShifter499/firmware-lge-joan` into pmaports —
+[`firmware-lg-joan-blobs`](https://github.com/ShapeShifter499/firmware-lg-joan-blobs)
+itself. Do **not** copy `ShapeShifter499/firmware-lg-joan` into pmaports —
 that is the retired owner-tarball recipe and is the source of:
 
 ```
-sha512sum: can't open '.../owner-firmware-lge-joan.tar': No such file or directory
-ERROR: Couldn't build aarch64/firmware-lge-joan-*.apk
+sha512sum: can't open '.../owner-firmware-lg-joan.tar': No such file or directory
+ERROR: Couldn't build aarch64/firmware-lg-joan-*.apk
 ```
 
 Optional extra-packages working copies still live in
@@ -115,7 +115,7 @@ they are already vendored here, so a first image does not copy them in.
 pmbootstrap install
 ```
 
-This builds `linux-lge-joan` from the pinned kernel tarball, which is the long
+This builds `linux-lg-joan` from the pinned kernel tarball, which is the long
 part of the run.
 
 ### 3. Flash
@@ -181,7 +181,7 @@ it into `pmOS_boot` + `pmOS_root`, destroying every byte on it.
    devices; on an exact H932 (no usable fastboot) `dd` it to
    `/dev/block/bootdevice/by-name/laf` from a rooted Android shell.
 2. Write the rootfs image to the card:
-   `xz -dc lge-joan.img.xz | dd of=/dev/sdX bs=4M conv=fsync`
+   `xz -dc lg-joan.img.xz | dd of=/dev/sdX bs=4M conv=fsync`
    (`/dev/sdX` is the whole card, e.g. `/dev/sdb`.)
 3. First boot grows the root filesystem to fill the card (minutes; reboots
    may follow).
@@ -205,7 +205,7 @@ the advanced loose images is an optional equivalent:
 
 ```sh
 fastboot flash boot boot.img           # optional fastboot route (US998-class)
-fastboot flash userdata lge-joan-root.img
+fastboot flash userdata lg-joan-root.img
 ```
 
 `userdata` becomes the pmOS root and auto-expands on first boot. **This
@@ -234,13 +234,13 @@ matter as long as the kernel can see the device; see the UUID caveat above.
 
 The firmware **recipe**, ALSA UCM, and VoLTE stack are in this fork. Proprietary
 blobs are **not** — they are fetched at build time from
-[`firmware-lge-joan-blobs`](https://github.com/ShapeShifter499/firmware-lge-joan-blobs).
+[`firmware-lg-joan-blobs`](https://github.com/ShapeShifter499/firmware-lg-joan-blobs).
 Working copies of the extra packages still live in
 [`ShapeShifter499/lg-v30-joan-pmos-packages`](https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages);
 a first `pmbootstrap install` does not copy them in.
 
 A first image already carries GPU/display, Bluetooth, WLAN and modem firmware,
-the joan UCM profile, and the VoLTE metapackage (`lge-joan-volte` →
+the joan UCM profile, and the VoLTE metapackage (`lg-joan-volte` →
 `joan-imsd`, ModemManager, 81voltd, rmtfs, Calls). Hardware status:
 
 | subsystem | state in this image |
@@ -254,7 +254,7 @@ the joan UCM profile, and the VoLTE metapackage (`lge-joan-volte` →
 **This image as a whole has not been device-qualified end-to-end.** Each row
 above was proven on lab RAM-boot builds; a qualification run of the exact
 published image is pending. First-boot IMS steps:
-`device/testing/lge-joan-volte/FIRST-INSTALL-VOLTE.md`.
+`device/testing/lg-joan-volte/FIRST-INSTALL-VOLTE.md`.
 
 ## Caveats
 

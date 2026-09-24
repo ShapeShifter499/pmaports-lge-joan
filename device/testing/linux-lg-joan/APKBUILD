@@ -3,12 +3,13 @@
 # pstore, display/backlight and Qualcomm GPU/UFS/SDHCI/QMP-PHY drivers
 # forced built-in)
 maintainer="Lance <Gero3977@gmail.com>"
-_flavor="lge-joan"
+_flavor="lg-joan"
 pkgname=linux-$_flavor
 pkgver=7.2.0_rc2
 pkgrel=5
 _commit="1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae"
 pkgdesc="Mainline kernel for the LG V30 (joan)"
+replaces="linux-lge-joan"
 arch="aarch64"
 _carch="arm64"
 _config="config-$_flavor.$arch"
@@ -67,6 +68,6 @@ package() {
 }
 
 sha512sums="
-478886684c4436ee023005d0e2d90be9a47542ecce173d7e438bb761a7e3d9cb7cae52b02716733a55497d8d220fdf23a8a54bb3c9934dc260aaa68a76caac61  linux-lge-joan-1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae.tar.gz
-075e4f5d254265baa6830e1a4be354dc710a0893385ad67932485e0b0499220893bc3b74e9521d4a332f1f3c8c58c4f4c98cd57f22ae5e94396d3bc5d48d9181  config-lge-joan.aarch64
+478886684c4436ee023005d0e2d90be9a47542ecce173d7e438bb761a7e3d9cb7cae52b02716733a55497d8d220fdf23a8a54bb3c9934dc260aaa68a76caac61  linux-lg-joan-1b42626b2b448d8fe97d7e2e0a63dec93c3bdaae.tar.gz
+075e4f5d254265baa6830e1a4be354dc710a0893385ad67932485e0b0499220893bc3b74e9521d4a332f1f3c8c58c4f4c98cd57f22ae5e94396d3bc5d48d9181  config-lg-joan.aarch64
 "

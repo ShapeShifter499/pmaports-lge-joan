@@ -1,9 +1,10 @@
 # Maintainer: Lance <Gero3977@gmail.com>
 maintainer="Lance <Gero3977@gmail.com>"
-pkgname=alsa-ucm-conf-lge-joan
+pkgname=alsa-ucm-conf-lg-joan
 pkgver=1.0
 pkgrel=2
 pkgdesc="ALSA UCM profile for the LG V30 (joan) sound card"
+replaces="alsa-ucm-conf-lge-joan"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
 license="BSD-3-Clause"
@@ -20,7 +21,7 @@ package() {
 		"$pkgdir/usr/share/alsa/ucm2/conf.d/sdm845/LG-V30.conf"
 
 	install -Dm644 "$srcdir/HiFi.conf" \
-		"$pkgdir/usr/share/alsa/ucm2/Qualcomm/sdm845-lge-joan/HiFi.conf"
+		"$pkgdir/usr/share/alsa/ucm2/Qualcomm/sdm845-lg-joan/HiFi.conf"
 }
 
 sha512sums="71d0ad4048ad81d595700fac08806d04da2002405db4d96207db0dd9a8cebed1bc4610a97f04e314785c35fd852fe2f7dfa27906800f48de086152df956171a9  LG-V30.conf

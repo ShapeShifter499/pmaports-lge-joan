@@ -1,9 +1,10 @@
 # Maintainer: Lance <Gero3977@gmail.com>
 maintainer="Lance <Gero3977@gmail.com>"
-pkgname=lge-joan-volte
+pkgname=lg-joan-volte
 pkgver=0.1
 pkgrel=2
 pkgdesc="LG V30 (joan) first-boot VoLTE stack: MM, 81voltd, Calls, IMS UA"
+replaces="lge-joan-volte"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
 license="MIT"
@@ -17,7 +18,7 @@ depends="
 	rmtfs
 	"
 source="
-	80-device-lge-joan.preset
+	80-device-lg-joan.preset
 	"
 options="!check"
 
@@ -30,10 +31,10 @@ systemd_units() {
 	install_if="$pkgname=$pkgver-r$pkgrel systemd"
 	depends="81voltd-systemd rmtfs-systemd"
 
-	install -Dm644 "$srcdir/80-device-lge-joan.preset" \
-		"$subpkgdir/usr/lib/systemd/system-preset/80-device-lge-joan.preset"
+	install -Dm644 "$srcdir/80-device-lg-joan.preset" \
+		"$subpkgdir/usr/lib/systemd/system-preset/80-device-lg-joan.preset"
 }
 
 sha512sums="
-20380b0d0d2602b10fe062f06f9424bc0f0c7c8f937443d9a2b6ae7816a74da6b08c26d447a8e03ed4fc08060d7151e6fe7db6499960207f751832375f27a95c  80-device-lge-joan.preset
+20380b0d0d2602b10fe062f06f9424bc0f0c7c8f937443d9a2b6ae7816a74da6b08c26d447a8e03ed4fc08060d7151e6fe7db6499960207f751832375f27a95c  80-device-lg-joan.preset
 "

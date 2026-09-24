@@ -4,19 +4,19 @@ You flashed pmOS onto a V30. This is the user-facing path — not a lab script.
 
 ## 1. Install the device stack
 
-On a finished image these should already be pulled in by `lge-joan-volte`.
+On a finished image these should already be pulled in by `lg-joan-volte`.
 If you built a minimal rootfs:
 
 ```sh
-sudo apk add lge-joan-volte
+sudo apk add lg-joan-volte
 # pulls: firmware (separate), modemmanager, rmtfs, 81voltd, calls, joan-imsd
 ```
 
 ### systemd (pmOS edge, default)
 
-The services enable themselves via systemd presets. `lge-joan-volte-systemd`
+The services enable themselves via systemd presets. `lg-joan-volte-systemd`
 installs the `rmtfs` and `81voltd` units, `joan-imsd-systemd` installs the IMS
-UA unit, and the pmOS base preset plus `80-device-lge-joan.preset` enable them.
+UA unit, and the pmOS base preset plus `80-device-lg-joan.preset` enable them.
 After first boot, verify:
 
 ```sh
@@ -26,7 +26,7 @@ systemctl status rmtfs ModemManager 81voltd joan-imsd
 ```
 
 Note: the Alpine `rmtfs` and `81voltd` packages ship bare binaries with no
-units; the units come from `lge-joan-volte-systemd`.
+units; the units come from `lg-joan-volte-systemd`.
 
 ### OpenRC (only if you chose openrc in pmbootstrap init)
 

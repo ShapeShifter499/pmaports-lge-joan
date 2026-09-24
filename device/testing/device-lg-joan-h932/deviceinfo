@@ -4,7 +4,7 @@
 deviceinfo_format_version="0"
 deviceinfo_name="LG V30 (H932)"
 deviceinfo_manufacturer="LG"
-deviceinfo_codename="lge-joan-h932"
+deviceinfo_codename="lg-joan-h932"
 deviceinfo_year="2017"
 deviceinfo_arch="aarch64"
 
@@ -36,4 +36,4 @@ deviceinfo_append_dtb="true"
 # usb-moded and stay off the fastboot number.
 deviceinfo_usb_idVendor="0x1d6b"
 deviceinfo_usb_idProduct="0x0104"
-deviceinfo_usb_serialnumber="lge-joan-h932"
+deviceinfo_usb_serialnumber="lg-joan-h932"

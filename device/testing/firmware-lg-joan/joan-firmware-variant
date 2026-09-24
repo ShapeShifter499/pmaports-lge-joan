@@ -9,8 +9,8 @@ dt_glob='/proc/device-tree/soc*/gpu*/zap-shader/firmware-name'
 fw_name=
 explain=false
 
-# Hashes of qcom/a540_zap.mdt as shipped by firmware-lge-joan-h930 / -h932
-# from firmware-lge-joan-blobs f79f6166 (Pie US99830b / H93230d).
+# Hashes of qcom/a540_zap.mdt as shipped by firmware-lg-joan-h930 / -h932
+# from firmware-lg-joan-blobs f79f6166 (Pie US99830b / H93230d).
 _h930_zap_mdt=cc51c6cec73c932c99ec82327c14f2eaa0308ced70e1e65573e0494b9ecc89bb
 _h932_zap_mdt=d33e37f06d6123d57841cb00df78a840fb09ad32fb529e8567a4e353e7894427
 
@@ -24,8 +24,8 @@ Prints "h930" or "h932": which A540 zap payload this system loads.
 The kernel DT asks for the generic qcom/a540_zap.mdt. Which signing family
 that file is comes from the installed package:
 
-  firmware-lge-joan-h930   H930, US998, H932PR, every other joan
-  firmware-lge-joan-h932   an exact LG-H932 only
+  firmware-lg-joan-h930   H930, US998, H932PR, every other joan
+  firmware-lg-joan-h932   an exact LG-H932 only
 
 There is deliberately no fallback: a wrong answer here means a payload
 signed for another model.
@@ -65,7 +65,7 @@ if [ -z "$variant" ]; then
 	generic=$fwdir/qcom/a540_zap.mdt
 	if [ ! -r "$generic" ]; then
 		echo "no zap payload at $generic and no per-variant device tree entry" >&2
-		echo "install firmware-lge-joan-h930 or firmware-lge-joan-h932" >&2
+		echo "install firmware-lg-joan-h930 or firmware-lg-joan-h932" >&2
 		exit 1
 	fi
 	sum=$(sha256sum "$generic" | cut -d' ' -f1)
@@ -79,7 +79,7 @@ if [ -z "$variant" ]; then
 			reason="installed qcom/a540_zap.mdt matches the h932 package"
 			;;
 		*)
-			echo "installed zap payload matches neither firmware-lge-joan-h930 nor -h932" >&2
+			echo "installed zap payload matches neither firmware-lg-joan-h930 nor -h932" >&2
 			exit 1
 			;;
 	esac
