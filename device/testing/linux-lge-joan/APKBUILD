@@ -7,8 +7,8 @@ _flavor="lge-joan"
 _dtb="qcom/msm8998-lge-joan"   # must match deviceinfo_dtb
 pkgname=linux-$_flavor
 pkgver=7.2.0_rc2
-pkgrel=22
-_commit=e6e796df38f49b51f2b251447dfe697961deacc0
+pkgrel=24
+_commit=f08d8c5f0da9074b0cad557e31699ebdfebf7d23
 pkgdesc="Mainline kernel for the LG V30 (joan)"
 arch="aarch64"
 _carch="arm64"
@@ -75,6 +75,6 @@ package() {
 }
 
 sha512sums="
-882075fede94b65148c65d2caa4d74877ce9013edb2cb956a6cdb15e12051cf4440ffc918827b30f92e7d41a98609e4bf1de2fae0a7c36be0f56d8f777367e1b  linux-lge-joan-a629edbd0c56e363263a33733486666b39a68f2b.tar.gz
-62aa76142595a6bec7cc36113068c91efe45b78cb4773956e177726232175f7bb01073607aab2181a418ca9fbeb084fe2f6bcb2dfdea81c8bd750fd66bffdc89  config-lge-joan.aarch64
+2c314f93aa8e5becaf6768fcf8fdf011f303732aff93a2fbf4b72c049d4422016441d0054fa718caf62293e3afd4ad46754acca09e847be2e4d27b0d9e12c9c6  linux-lge-joan-f08d8c5f0da9074b0cad557e31699ebdfebf7d23.tar.gz
+ac2e666e39164dbf0d8968715cac9f809e4fe03d1d934b9895998aef6da51b0c3e85e819424bec0c1cad18355040c4be6af3301fe7159b84ed8c08c083106c8b  config-lge-joan.aarch64
 "
