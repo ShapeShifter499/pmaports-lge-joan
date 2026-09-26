@@ -3,13 +3,16 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=16
+pkgrel=17
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
 options="!check !archcheck"
 depends="
 	alsa-ucm-conf-lge-joan
+	gnome-sound-recorder
+	neard
+	pwvucontrol
 	firmware-lge-joan
 	firmware-lge-joan-h930
 	firmware-lge-joan-initramfs
@@ -35,6 +38,7 @@ source="deviceinfo
 	90-joan-bfq.rules
 	joan-dconf-profile
 	00-joan-performance
+	90-lge-joan.preset
 	"
 
 build() {
@@ -61,6 +65,12 @@ package() {
 	ln -s /usr/lib/systemd/user/joan-lock-scale.service \
 		"$pkgdir"/etc/systemd/user/graphical-session.target.wants/joan-lock-scale.service
 
+	# Default apps for hardware the V30 has, beyond the UI's own set
+	# (calls, chatty and snapshot come with phosh): a voice recorder, a
+	# per-application volume panel, and neard for the PN547 NFC controller.
+	install -Dm644 "$srcdir"/90-lge-joan.preset \
+		"$pkgdir"/usr/lib/systemd/system-preset/90-lge-joan.preset
+
 	# WebRTC noise suppression / echo cancellation on the mic
 	install -Dm644 "$srcdir"/50-joan-echo-cancel.conf \
 		"$pkgdir"/usr/share/pipewire/pipewire.conf.d/50-joan-echo-cancel.conf
@@ -75,4 +85,5 @@ ab2f4f75d34677222d39b7dd79229143fd1c65e613bf71773368d004a74e6a15cddbcca42a81a073
 ce6ea306df8497e229cb598eff1dc9c29777900583aad7f46ac878bc00b46fcca16097e7673708639356f8b98fec6ff393623a8ab2ef6e765fb03be9767b4430  90-joan-bfq.rules
 6e23b525531b94e6b40f2118570b7e162b3e41a4a2c33f99b1a1cba5fa9e65f53048c382c6fd1196a6421ab4c40206dc995a726ac157480b85623ab4164418ad  joan-dconf-profile
 f85c89c67727bb8ed01c80b21466527c371a280a70a9a6fb336b52219e0239232b55e97fdc8a6964f0849f81ee9cbea759c2c6a6d26d8f31eb64acd4ccf0af5e  00-joan-performance
+aa76e1f24ed8c7ed2527c10fde44b5d13a0e9d14b1a939a4cb72254e2593772cd19852f8ec7320a2f83a833aaffe0ef18bb941ec3aa9f350136c3698a2429656  90-lge-joan.preset
 "
