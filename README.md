@@ -118,6 +118,30 @@ pmbootstrap install
 This builds `linux-lge-joan` from the pinned kernel tarball, which is the long
 part of the run.
 
+For a fastboot device, plain `pmbootstrap install` produces separate boot and
+root images for flashing into the phone's own partitions. To run pmOS from a
+microSD card instead (the non-destructive setup), ask for a card:
+
+```sh
+pmbootstrap install --sdcard=/dev/sdX      # card in a reader on this machine
+# or build one combined image and write it yourself:
+pmbootstrap install --no-split
+#   -> <work>/chroot_native/home/pmos/rootfs/lge-joan.img (pmOS_boot + pmOS_root)
+```
+
+Without a card reader, the image can be written from a rooted Android on the
+phone. Push it compressed, then decompress it straight onto the card; streaming
+it through `adb exec-in` is about ten times slower:
+
+```sh
+zstd -3 lge-joan.img
+adb push lge-joan.img.zst /data/local/tmp/
+adb shell 'zstd -dc /data/local/tmp/lge-joan.img.zst | dd of=/dev/block/mmcblk0 bs=4194304; sync'
+```
+
+`/dev/block/mmcblk0` is the whole microSD. Check its size first; everything on it is replaced.
+The first boot grows `pmOS_root` to fill the card.
+
 ### 3. Flash
 
 `deviceinfo` selects `fastboot`, and the kernel is packed into a boot image
