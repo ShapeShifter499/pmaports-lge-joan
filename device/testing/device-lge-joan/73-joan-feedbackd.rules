@@ -1,0 +1,6 @@
+# The V30's vibration motor is a Dongwoon DW7800 (drivers/input/misc/
+# dw7800-haptics.c). feedbackd only drives input devices tagged as "vibra",
+# and its own rules (72-feedbackd.rules) do not list this chip yet.
+ACTION=="remove", GOTO="joan_feedbackd_end"
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT}=="1", SUBSYSTEMS=="input", ATTRS{name}=="dw7800-haptics", TAG+="uaccess", ENV{FEEDBACKD_TYPE}="vibra"
+LABEL="joan_feedbackd_end"

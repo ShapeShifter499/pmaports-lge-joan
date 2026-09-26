@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan-h932
 pkgdesc="LG V30, T-Mobile H932 only (differently signed firmware)"
 pkgver=1
-pkgrel=10
+pkgrel=11
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -34,6 +34,7 @@ source="deviceinfo
 	phosh-start-timeout.conf
 	90-joan-bfq.rules
 	90-lge-joan.preset
+	73-joan-feedbackd.rules
 	"
 
 build() {
@@ -47,6 +48,10 @@ package() {
 	# for the PN547 NFC controller, enabled by this preset.
 	install -Dm644 "$srcdir"/90-lge-joan.preset \
 		"$pkgdir"/usr/lib/systemd/system-preset/90-lge-joan.preset
+
+	# Let feedbackd drive the DW7800 vibration motor
+	install -Dm644 "$srcdir"/73-joan-feedbackd.rules \
+		"$pkgdir"/usr/lib/udev/rules.d/73-joan-feedbackd.rules
 
 	# Raise Phosh's start timeout; the file's header records the measurement.
 	install -Dm644 "$srcdir"/phosh-start-timeout.conf \
@@ -67,4 +72,5 @@ e541a5c9127ef86c9ebde27744c2f483004ba54731ad31f2326550b81105a727a46855c2f4faeb94
 4ac81d5bd50abadd9e123d115d2ab633243cb7c72336d14ef884523fbf20f3ab56bd0722163bd2e080ba4036daf6ea27f13ec3d6515adf847fda2edccd362fa5  phosh-start-timeout.conf
 ce6ea306df8497e229cb598eff1dc9c29777900583aad7f46ac878bc00b46fcca16097e7673708639356f8b98fec6ff393623a8ab2ef6e765fb03be9767b4430  90-joan-bfq.rules
 aa76e1f24ed8c7ed2527c10fde44b5d13a0e9d14b1a939a4cb72254e2593772cd19852f8ec7320a2f83a833aaffe0ef18bb941ec3aa9f350136c3698a2429656  90-lge-joan.preset
+2f2044e35d830cb3333277105df3b7e1071ac4b00aebc06e72f05bd6cd8ee4de0bd554be3f662de344346a423f1df411b107888c86bf0708845e953a71a0d0fa  73-joan-feedbackd.rules
 "
