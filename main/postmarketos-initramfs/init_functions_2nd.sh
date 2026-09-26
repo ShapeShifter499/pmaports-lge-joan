@@ -124,7 +124,16 @@ resize_root_filesystem() {
 		ext4)
 			echo "Resize 'ext4' root filesystem ($partition)"
 			modprobe ext4
-			resize2fs "$partition"
+			if ! resize2fs "$partition"; then
+				# resize2fs refuses a file system that was mounted
+				# after its last full check, and every image
+				# pmbootstrap builds is (it copies the rootfs in after
+				# mkfs); e2fsck -p above skips a clean one. Check it
+				# fully -- preen mode still stops on real errors --
+				# and try once more.
+				echo "Check 'ext4' root filesystem before resize ($partition)"
+				e2fsck -f -p "$partition" && resize2fs "$partition"
+			fi
 			;;
 		f2fs)
 			echo "Resize 'f2fs' root filesystem ($partition)"
