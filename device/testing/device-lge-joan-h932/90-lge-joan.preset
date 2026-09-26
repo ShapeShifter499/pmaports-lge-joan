@@ -1,0 +1,4 @@
+# Default services for the LG V30 (joan).
+# NFC: nxp-nci drives the PN547 through the kernel NFC subsystem; neard is
+# the daemon that exposes it to userspace.
+enable neard.service

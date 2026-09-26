@@ -10,22 +10,22 @@ arch="aarch64"
 options="!check !archcheck"
 depends="
 	alsa-ucm-conf-lge-joan
-	gnome-sound-recorder
-	neard
-	pwvucontrol
 	firmware-lge-joan
 	firmware-lge-joan-h930
 	firmware-lge-joan-initramfs
 	firmware-qcom-adreno-a530
+	gnome-sound-recorder
 	lge-joan-volte
 	linux-lge-joan
 	mkbootimg
+	neard
 	pipewire-alsa
 	pipewire-echo-cancel
 	pipewire-pulse
-	postmarketos-usb-moded-default-profile-developer
 	postmarketos-base
 	postmarketos-base-ui-audio-backend-pipewire
+	postmarketos-usb-moded-default-profile-developer
+	pwvucontrol
 	soc-qcom
 	wireplumber
 "
