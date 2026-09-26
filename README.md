@@ -125,9 +125,16 @@ microSD card instead (the non-destructive setup), ask for a card:
 ```sh
 pmbootstrap install --sdcard=/dev/sdX      # card in a reader on this machine
 # or build one combined image and write it yourself:
-pmbootstrap install --no-split
+pmbootstrap install --no-split --sector-size 512
 #   -> <work>/chroot_native/home/pmos/rootfs/lge-joan.img (pmOS_boot + pmOS_root)
 ```
+
+Pass `--sector-size 512` for a card image. `deviceinfo` sets 4096 because the
+phone's UFS uses 4 KiB logical sectors, and an image file is laid out for that
+by default. A microSD card uses 512-byte sectors, so the kernel finds no
+partition table on a 4096-byte image. The initramfs then stops with
+"failed to mount subpartitions". `--sdcard` partitions the real card and
+is not affected.
 
 Without a card reader, the image can be written from a rooted Android on the
 phone. Push it compressed, then decompress it straight onto the card; streaming
@@ -236,7 +243,9 @@ it into `pmOS_boot` + `pmOS_root`, destroying every byte on it.
    `/dev/block/bootdevice/by-name/laf` from a rooted Android shell.
 2. Write the rootfs image to the card:
    `xz -dc lge-joan.img.xz | dd of=/dev/sdX bs=4M conv=fsync`
-   (`/dev/sdX` is the whole card, e.g. `/dev/sdb`.)
+   (`/dev/sdX` is the whole card, e.g. `/dev/sdb`.) The card image is built
+   with `--sector-size 512`. The internal-install image keeps deviceinfo's
+   4096, and they are not interchangeable.
 3. First boot grows the root filesystem to fill the card (minutes; reboots
    may follow).
 
