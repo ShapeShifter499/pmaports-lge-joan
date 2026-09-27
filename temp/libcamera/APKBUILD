@@ -3,7 +3,7 @@ maintainer="Robert Mader <robert.mader@collabora.com>"
 pkgname=libcamera
 _pkgver=0.7.2
 pkgver=9999$_pkgver
-pkgrel=4
+pkgrel=5
 pkgdesc="Linux camera framework"
 url="https://libcamera.org/"
 arch="all"
@@ -47,6 +47,7 @@ subpackages="
 	"
 _tuning_files="
 	hi846.yaml
+	imx351.yaml
 	imx355.yaml
 	imx363.yaml
 	imx371.yaml
@@ -192,6 +193,7 @@ ac4e3c742fde4f8e4775bd2afbaaecb18fa49b869eb4309032bae985680f97443353eb384de19a9b
 9215de0c0b8da2407f40af83ab754ac84d2b6afd2966167ed29f367cfcbbed7a1d84a4f4bf575357b15b613da13cf7975073dc47effd22aecaa8b2b5cac98ba0  0009-libcamera-Add-sensor-helper-and-properties-for-the-S.patch
 22167a4eceb6d1b40b0b7c45fdf116c71684f5340de7f767535cb8e160ad9d2ae0f00cb3d461f73a344520a48a4641cf46226841d78bee06bfbfd2a91337f754  qcam.desktop
 2ee566653b17d565d2c0de67cbe6ebad25df5aac6051cad78e6bae52016fa2ca0247e964d735ac776b3e0bd447ead9c4fcb26cd7629228cdba3ceb91b46f378f  hi846.yaml
+fa0f06592004d0bfaf491060fb3cc352886b13cd69477e665af00fe12f02d4ff108d4e31b395f88c4800d0b5d704098d224a492bcc6cc62fcfa2a1d7510a47ca  imx351.yaml
 4942edd551dcf51630246f71e600c17760d3574d5d45e5530d6cfeefe2c9ab1a812fbe220f8e89d92e19a499c592b2507c801ca4eb74cd15fcecb60bff5c650b  imx355.yaml
 285c6d0d712df341c0117c3762ddc139f53f44e6be36c3388d1a62696429175e2916f392163131e21f410c3676f02f5d125f375171f45f8d82ad278aa5076c62  imx363.yaml
 1b1f6d36311bee38006eaa1e380571fc9fbd5625fd72f63309426d3651483cef52a176d56cdebd2ce46cbb264684ede186740df169027d2bf27d0f3057da2f86  imx371.yaml
