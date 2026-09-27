@@ -1,0 +1,83 @@
+From dd2adcde51dd98f9449e8188b1c334f2a080f621 Mon Sep 17 00:00:00 2001
+From: Lance <Gero3977@gmail.com>
+Date: Sat, 26 Sep 2026 17:08:16 -0700
+Subject: [PATCH] libcamera: Add sensor helper and properties for the Sony
+ IMX351
+
+The IMX351 is the 16 MP main camera of the LG V30. Its analogue gain
+register holds 1024 - 1024 / gain, from 0 (x1) to 960 (x16). This is
+the conversion LG's sensor library for the V30 (libmmcamera_imx351.so,
+US998 stock firmware) performs: it clamps the requested gain to
+[1.0, 16.0] and returns (u32)(1024.0 - 1024.0 / gain). The kernel
+driver exposes the register code as V4L2_CID_ANALOGUE_GAIN in [0, 960].
+
+Without a helper the software ISP's AGC treats the code as a linear
+gain and converges very slowly. On the V30 in a dim room, with exposure
+already at its maximum, the gain code crept from 20 to 412 over 9
+seconds, which is only about x1.7.
+
+Unit cell size is 1.0 um: the sensor's native area is 4656x3496 pixels,
+and the V30's main camera is specified as 1/3.1", 1.0 um. The test
+pattern modes follow the kernel driver's menu, which writes the menu
+index to the SMIA test pattern register 0x0600 unchanged (1 solid
+colour, 2 colour bars, 3 fade to grey, 4 PN9). The black level and the
+sensor delays are left unset: neither is in the vendor sensor library,
+and they have not been measured.
+
+Signed-off-by: Lance <Gero3977@gmail.com>
+Assisted-by: Claude-Code:claude-opus-5-5
+---
+ src/ipa/libipa/camera_sensor_helper.cpp           | 14 ++++++++++++++
+ src/libcamera/sensor/camera_sensor_properties.cpp | 11 +++++++++++
+ 2 files changed, 25 insertions(+)
+
+diff --git a/src/ipa/libipa/camera_sensor_helper.cpp b/src/ipa/libipa/camera_sensor_helper.cpp
+index 9457d62b3..0ea73c5f0 100644
+--- a/src/ipa/libipa/camera_sensor_helper.cpp
++++ b/src/ipa/libipa/camera_sensor_helper.cpp
+@@ -617,6 +617,20 @@ public:
+ };
+ REGISTER_CAMERA_SENSOR_HELPER("imx335", CameraSensorHelperImx335)
+ 
++class CameraSensorHelperImx351 : public CameraSensorHelper
++{
++public:
++	CameraSensorHelperImx351()
++	{
++		/*
++		 * gain = 1024 / (1024 - code), code = [0, 960], max gain = x16,
++		 * as the vendor sensor library converts it.
++		 */
++		gain_ = AnalogueGainLinear{ 0, 1024, -1, 1024 };
++	}
++};
++REGISTER_CAMERA_SENSOR_HELPER("imx351", CameraSensorHelperImx351)
++
+ class CameraSensorHelperImx415 : public CameraSensorHelper
+ {
+ public:
+diff --git a/src/libcamera/sensor/camera_sensor_properties.cpp b/src/libcamera/sensor/camera_sensor_properties.cpp
+index 28043150e..0d891a5a8 100644
+--- a/src/libcamera/sensor/camera_sensor_properties.cpp
++++ b/src/libcamera/sensor/camera_sensor_properties.cpp
+@@ -261,6 +261,17 @@ const CameraSensorProperties *CameraSensorProperties::get(const std::string &sen
+ 			.testPatternModes = {},
+ 			.sensorDelays = { },
+ 		} },
++		{ "imx351", {
++			.unitCellSize = { 1000, 1000 },
++			.testPatternModes = {
++				{ controls::draft::TestPatternModeOff, 0 },
++				{ controls::draft::TestPatternModeSolidColor, 1 },
++				{ controls::draft::TestPatternModeColorBars, 2 },
++				{ controls::draft::TestPatternModeColorBarsFadeToGray, 3 },
++				{ controls::draft::TestPatternModePn9, 4 },
++			},
++			.sensorDelays = { },
++		} },
+ 		{ "imx415", {
+ 			.unitCellSize = { 1450, 1450 },
+ 			.testPatternModes = {},
+-- 
+2.55.0
+
