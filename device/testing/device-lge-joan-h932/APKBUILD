@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lge-joan-h932
 pkgdesc="LG V30, T-Mobile H932 only (differently signed firmware)"
 pkgver=1
-pkgrel=11
+pkgrel=12
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -31,6 +31,8 @@ depends="
 makedepends="devicepkg-dev"
 source="deviceinfo
 	50-joan-echo-cancel.conf
+	53-joan-driver-priority.conf
+	54-joan-no-mmap.conf
 	phosh-start-timeout.conf
 	90-joan-bfq.rules
 	90-lge-joan.preset
@@ -64,11 +66,20 @@ package() {
 	# WebRTC noise suppression / echo cancellation on the mic
 	install -Dm644 "$srcdir"/50-joan-echo-cancel.conf \
 		"$pkgdir"/usr/share/pipewire/pipewire.conf.d/50-joan-echo-cancel.conf
+
+	# WirePlumber ALSA settings measured on this device (see each file's
+	# header): the sink drives the graph, and the q6asm frontends get
+	# IRQ-driven, non-mmap periods within their size limits.
+	install -Dm644 -t "$pkgdir"/usr/share/wireplumber/wireplumber.conf.d \
+		"$srcdir"/53-joan-driver-priority.conf \
+		"$srcdir"/54-joan-no-mmap.conf
 }
 
 sha512sums="
 d90c8cebf4d55c226047a89f3caa1db3c6f08169862022eabe173736dfb546bd23805afe1cd4fa29b15b425b228c2e780ed058076e2414e90984afe6f6b0f788  deviceinfo
 e541a5c9127ef86c9ebde27744c2f483004ba54731ad31f2326550b81105a727a46855c2f4faeb94a6bea3c7cb2bd551264fa8c787417311dab1ef9e620c4d1a  50-joan-echo-cancel.conf
+7074b0d87f54fa9c90383bca028f761a543f9c13d976b4c9096482ca98184fc5e82e922db8e339dc95d34d46c02f43dd726d9f8348ccbd801b13dfcf60b95bbe  53-joan-driver-priority.conf
+6502a1ee494f223c3184f832ce0aa6d7d88ce5cf5294def54361dc4798fd7664f90785df380d3c975a5215178f23d6aabbae3a1bbf115bcd3441190b47cd2dcc  54-joan-no-mmap.conf
 4ac81d5bd50abadd9e123d115d2ab633243cb7c72336d14ef884523fbf20f3ab56bd0722163bd2e080ba4036daf6ea27f13ec3d6515adf847fda2edccd362fa5  phosh-start-timeout.conf
 ce6ea306df8497e229cb598eff1dc9c29777900583aad7f46ac878bc00b46fcca16097e7673708639356f8b98fec6ff393623a8ab2ef6e765fb03be9767b4430  90-joan-bfq.rules
 aa76e1f24ed8c7ed2527c10fde44b5d13a0e9d14b1a939a4cb72254e2593772cd19852f8ec7320a2f83a833aaffe0ef18bb941ec3aa9f350136c3698a2429656  90-lge-joan.preset
