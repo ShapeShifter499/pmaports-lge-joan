@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lg-joan-h932
 pkgdesc="LG V30, T-Mobile H932 only (differently signed firmware)"
 pkgver=1
-pkgrel=13
+pkgrel=14
 url="https://postmarketos.org"
 license="MIT"
 provides="device-lge-joan-h932=$pkgver-r$pkgrel"
@@ -12,6 +12,7 @@ arch="aarch64"
 options="!check !archcheck"
 depends="
 	alsa-ucm-conf-lg-joan
+	bootmac
 	firmware-lg-joan
 	firmware-lg-joan-h932
 	firmware-lg-joan-initramfs

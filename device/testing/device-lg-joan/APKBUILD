@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lg-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=20
+pkgrel=21
 url="https://postmarketos.org"
 license="MIT"
 provides="device-lge-joan=$pkgver-r$pkgrel"
@@ -12,6 +12,7 @@ arch="aarch64"
 options="!check !archcheck"
 depends="
 	alsa-ucm-conf-lg-joan
+	bootmac
 	firmware-lg-joan
 	firmware-lg-joan-h930
 	firmware-lg-joan-initramfs
