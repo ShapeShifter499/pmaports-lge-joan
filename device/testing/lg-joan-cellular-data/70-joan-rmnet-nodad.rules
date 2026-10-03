@@ -1,0 +1,7 @@
+# LG V30 (joan): the IPA rmnet data netdevs (qmapmux*, rmnet*) never
+# answer IPv6 neighbor solicitation, so kernel DAD always fails and the
+# carrier-provisioned address stays tentative — no usable routes, and
+# NetworkManager shows the no-connection triangle. Turn DAD off on these
+# netdevs at creation, before NetworkManager applies the address.
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="qmapmux*", RUN+="/bin/sh -c 'echo 0 > /proc/sys/net/ipv6/conf/%k/accept_dad'"
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="rmnet*", RUN+="/bin/sh -c 'echo 0 > /proc/sys/net/ipv6/conf/%k/accept_dad'"

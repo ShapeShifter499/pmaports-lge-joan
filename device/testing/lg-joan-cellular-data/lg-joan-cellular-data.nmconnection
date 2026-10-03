@@ -1,0 +1,15 @@
+[connection]
+id=lge-joan-cellular
+type=gsm
+autoconnect=true
+permissions=
+
+[gsm]
+# No APN: NetworkManager asks ModemManager, which picks the APN from
+# mobile-broadband-provider-info by the operator id — carrier-agnostic.
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto

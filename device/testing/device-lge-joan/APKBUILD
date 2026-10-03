@@ -16,6 +16,7 @@ depends="
 	firmware-qcom-adreno-a530
 	gnome-sound-recorder
 	lge-joan-volte
+	lg-joan-cellular-data
 	linux-lge-joan
 	mkbootimg
 	neard
