@@ -1,12 +1,14 @@
 # Maintainer: Lance <Gero3977@gmail.com>
 maintainer="Lance <Gero3977@gmail.com>"
-pkgname=firmware-lge-joan
+pkgname=firmware-lg-joan
 pkgver=1.0
-pkgrel=10
+pkgrel=11
 pkgdesc="Firmware for the LG V30 (joan)"
 url="https://github.com/ShapeShifter499/firmware-lge-joan-blobs"
 arch="aarch64"
 license="custom"
+provides="firmware-lge-joan=$pkgver-r$pkgrel"
+replaces="firmware-lge-joan"
 subpackages="
 	$pkgname-h930:h930
 	$pkgname-h932:h932
@@ -25,7 +27,7 @@ _fwdir="/usr/lib/firmware"
 source="
 	firmware-lge-joan-blobs-$_commit.tar.gz::$url/archive/$_commit.tar.gz
 	joan-firmware-variant
-	30-lge-joan-gpu.files
+	30-lg-joan-gpu.files
 	"
 
 # Copy one tree from the mirror, verifying every file against the manifest as
@@ -79,7 +81,8 @@ package() {
 h930() {
 	pkgdesc="LG V30 firmware (H930, US998, H932PR and every other joan)"
 	depends="firmware-qcom-adreno-a530 linux-firmware-ath10k !$pkgname-h932"
-	provides="$pkgname-variant=$pkgver-r$pkgrel"
+	provides="$pkgname-variant=$pkgver-r$pkgrel firmware-lge-joan-h930=$pkgver-r$pkgrel"
+	replaces="firmware-lge-joan-h930"
 	install="$subpkgname.post-install"
 
 	_install_tree h930 "$subpkgdir$_fwdir"
@@ -89,7 +92,8 @@ h930() {
 h932() {
 	pkgdesc="LG V30 firmware (exact LG-H932 only, differently signed)"
 	depends="firmware-qcom-adreno-a530 linux-firmware-ath10k !$pkgname-h930"
-	provides="$pkgname-variant=$pkgver-r$pkgrel"
+	provides="$pkgname-variant=$pkgver-r$pkgrel firmware-lge-joan-h932=$pkgver-r$pkgrel"
+	replaces="firmware-lge-joan-h932"
 	install="$subpkgname.post-install"
 
 	_install_tree h932 "$subpkgdir$_fwdir"
@@ -98,14 +102,16 @@ h932() {
 
 firmware_initramfs() {
 	pkgdesc="Early GPU and Bluetooth firmware list for the LG V30 initramfs"
+	provides="firmware-lge-joan-initramfs=$pkgver-r$pkgrel"
+	replaces="firmware-lge-joan-initramfs"
 	depends="$pkgname=$pkgver-r$pkgrel $pkgname-variant"
 
-	install -Dm644 "$srcdir/30-lge-joan-gpu.files" \
-		"$subpkgdir/usr/share/mkinitfs/files/30-lge-joan-gpu.files"
+	install -Dm644 "$srcdir/30-lg-joan-gpu.files" \
+		"$subpkgdir/usr/share/mkinitfs/files/30-lg-joan-gpu.files"
 }
 
 sha512sums="
 dde4a6d04705b1a2dab948f0780d3015a9c11f0a1670b03f9c37b4cf63c228b54520393518f486efc278dcfe0af325094780ed27332243733d369e30e5b0ed61  firmware-lge-joan-blobs-a386e7ef9314a6680bd29a847f602f21c1a84afc.tar.gz
-5b3c15d8a1db1b72cdfbdb2c93ba880966c9a9c9cc81723e8df66b675dba3b14b666aa92de9ccc8594c1d1905165dfa86b1e7c299b0d0e87046b04786593355a  joan-firmware-variant
-765b47972bce74922789db9bd913973e5b393b0dc3054ac63645e521700504cfe67398051c5e2d3323009a641b8fbb400c6ff1d1f7766a4e7ed3d34172644e6b  30-lge-joan-gpu.files
+f75c5bca7c2278833725f815c30b6cfe3ab6dbc31e5570d7d34ea82fd2cad88c3c207ee8ea713956383861846a326a74a6d8cf021ed198c93c56f1fcfc540c01  joan-firmware-variant
+765b47972bce74922789db9bd913973e5b393b0dc3054ac63645e521700504cfe67398051c5e2d3323009a641b8fbb400c6ff1d1f7766a4e7ed3d34172644e6b  30-lg-joan-gpu.files
 "

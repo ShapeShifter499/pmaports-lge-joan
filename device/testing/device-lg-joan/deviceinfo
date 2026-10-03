@@ -4,7 +4,7 @@
 deviceinfo_format_version="0"
 deviceinfo_name="LG V30"
 deviceinfo_manufacturer="LG"
-deviceinfo_codename="lge-joan"
+deviceinfo_codename="lg-joan"
 deviceinfo_year="2017"
 deviceinfo_arch="aarch64"
 
@@ -27,7 +27,7 @@ deviceinfo_flash_pagesize="4096"
 
 # Mainline kernel options
 deviceinfo_kernel_cmdline="panic=5 pmos.force-partition-resize ipa.lowmem=1"
-deviceinfo_dtb="qcom/msm8998-lge-joan"
+deviceinfo_dtb="qcom/msm8998-lg-joan"
 deviceinfo_append_dtb="true"
 
 # USB gadget IDs — do NOT use the pmOS default 18d1:d001.
@@ -36,4 +36,4 @@ deviceinfo_append_dtb="true"
 # usb-moded and stay off the fastboot number.
 deviceinfo_usb_idVendor="0x1d6b"
 deviceinfo_usb_idProduct="0x0104"
-deviceinfo_usb_serialnumber="lge-joan"
+deviceinfo_usb_serialnumber="lg-joan"

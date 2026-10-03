@@ -1,5 +1,5 @@
 [connection]
-id=lge-joan-cellular
+id=lg-joan-cellular
 type=gsm
 autoconnect=true
 permissions=

@@ -1,4 +1,4 @@
-# alsa-ucm-conf-lge-joan
+# alsa-ucm-conf-lg-joan
 
 ALSA Use Case Manager profile for the LG V30 (joan).
 

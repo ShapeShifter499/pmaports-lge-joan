@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=lg-joan-cellular-data
 pkgver=0.1
-pkgrel=0
+pkgrel=1
 pkgdesc="LG V30 (joan) cellular data defaults — rmnet DAD workaround + NetworkManager profile"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -22,5 +22,5 @@ package() {
 }
 sha512sums="
 76fae02a9453a2536600535c9e35af6e10f6189e5db1091c14c2b3673e9848abfc93ee996fa5ea73e005703e9c1ec9963190b81edb4b640653ccf8023bbd4414  70-joan-rmnet-nodad.rules
-39db13f8c15dbd654785abfdc326b0db1673326514cbc321bc759f2026bdf184e32f54bd1e1dff55fe44677f94439a306df92302ca21a382f96b51578659d987  lg-joan-cellular-data.nmconnection
+ca9d4ca011ecd8bbd1c1437d3ef1d0a9f6610ef0a7820ef880bd88e36a51d069e38d5922a676a487fe1e48a73c02f45ab30e3e7523065e636275ec57743163c3  lg-joan-cellular-data.nmconnection
 "

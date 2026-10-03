@@ -1,20 +1,20 @@
-# firmware-lge-joan
+# firmware-lg-joan
 
 Firmware for the LG V30 (joan): a shared base plus one of two signing-family
 packages.
 
 | package | contents |
 |---|---|
-| `firmware-lge-joan` | A540 GPMU + QCA Bluetooth — identical on every joan |
-| `firmware-lge-joan-h930` | modem, ADSP, IPA, WLAN, zap — **H930, US998, H932PR, all others** |
-| `firmware-lge-joan-h932` | the same set for an **exact LG-H932** |
-| `firmware-lge-joan-initramfs` | mkinitfs list for early GPU/BT firmware |
+| `firmware-lg-joan` | A540 GPMU + QCA Bluetooth — identical on every joan |
+| `firmware-lg-joan-h930` | modem, ADSP, IPA, WLAN, zap — **H930, US998, H932PR, all others** |
+| `firmware-lg-joan-h932` | the same set for an **exact LG-H932** |
+| `firmware-lg-joan-initramfs` | mkinitfs list for early GPU/BT firmware |
 
 Install the base and exactly one family:
 
 ```sh
-apk add firmware-lge-joan firmware-lge-joan-h930   # almost everyone
-apk add firmware-lge-joan firmware-lge-joan-h932   # an exact LG-H932
+apk add firmware-lg-joan firmware-lg-joan-h930   # almost everyone
+apk add firmware-lg-joan firmware-lg-joan-h932   # an exact LG-H932
 ```
 
 They conflict, and there is deliberately no default. Both warn on install and
@@ -24,7 +24,7 @@ read the bootloader model from `/proc/cmdline` to tell you if you picked wrong.
 The device packages in
 [`pmaports-lge-joan`](https://github.com/ShapeShifter499/pmaports-lge-joan)
 already pull the right pair: pick `joan` or `joan-h932` at `pmbootstrap init`.
-That fork vendors this recipe under `device/testing/firmware-lge-joan`, so a
+That fork vendors this recipe under `device/testing/firmware-lg-joan`, so a
 clone of pmaports does not need a copy-in.
 
 ## Why the split
@@ -66,12 +66,12 @@ recipe is stale — use this package (pkgrel 8+), not
 ## Building
 
 This directory is a standard Alpine `APKBUILD`. It is already in
-`pmaports-lge-joan/device/testing/firmware-lge-joan`. Edit it there, or copy
+`pmaports-lge-joan/device/testing/firmware-lg-joan`. Edit it there, or copy
 this working copy over that path, then:
 
 ```sh
-pmbootstrap checksum firmware-lge-joan   # only if you edited the recipe
-pmbootstrap build firmware-lge-joan
+pmbootstrap checksum firmware-lg-joan   # only if you edited the recipe
+pmbootstrap build firmware-lg-joan
 ```
 
 `pmbootstrap build` fetches
@@ -80,7 +80,7 @@ pmbootstrap build firmware-lge-joan
 
 ## Licence
 
-`LICENSE` and `NOTICE` install to `/usr/share/licenses/firmware-lge-joan/`, the
+`LICENSE` and `NOTICE` install to `/usr/share/licenses/firmware-lg-joan/`, the
 files and layout `firmware-qcom-adreno` uses. The Qualcomm licence permits
 binary redistribution on condition the terms file ships with it and notices are
 not removed. The zap shader is LG-signed rather than Qualcomm's, and these

@@ -8,13 +8,13 @@ set -eu
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 selector=$repo_dir/joan-firmware-variant
 apkbuild=$repo_dir/APKBUILD
-files=$repo_dir/30-lge-joan-gpu.files
+files=$repo_dir/30-lg-joan-gpu.files
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 sh -n "$selector"
-sh -n "$repo_dir/firmware-lge-joan-h930.post-install"
-sh -n "$repo_dir/firmware-lge-joan-h932.post-install"
+sh -n "$repo_dir/firmware-lg-joan-h930.post-install"
+sh -n "$repo_dir/firmware-lg-joan-h932.post-install"
 
 grep -q 'owner-firmware-lge-joan' "$apkbuild" && \
 	fail "APKBUILD still references owner-firmware-lge-joan"
