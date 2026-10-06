@@ -1,0 +1,24 @@
+# Maintainer: Lance <Gero3977@gmail.com>
+pkgname=nfc-tags
+pkgver=0.1
+pkgrel=0
+pkgdesc="Read and write NFC tags through neard (GTK4/libadwaita)"
+url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
+arch="noarch"
+license="GPL-3.0-or-later"
+depends="python3 py3-gobject3 gtk4.0 libadwaita neard"
+options="!check"
+source="
+	nfc-tags
+	io.github.ShapeShifter499.NfcTags.desktop
+	"
+
+package() {
+	install -Dm755 "$srcdir"/nfc-tags "$pkgdir"/usr/bin/nfc-tags
+	install -Dm644 "$srcdir"/io.github.ShapeShifter499.NfcTags.desktop \
+		"$pkgdir"/usr/share/applications/io.github.ShapeShifter499.NfcTags.desktop
+}
+sha512sums="
+f4fe3243f324a52d5a2b7698dce04ec59cf0626125b7a073db3ec1af407e8afd070216fd33a3f530f948454519c03d8e7ee244fd5e92cc3783e02e73cbe1defe  nfc-tags
+8953e68e00120e248bf3ad61101fdeeb3903a9b61198f5c4f8473b60efd0627830e22c4bb37bb3b1a4e5ec3e1aed4f4085f246c01927eeb67037f98fa4d086be  io.github.ShapeShifter499.NfcTags.desktop
+"

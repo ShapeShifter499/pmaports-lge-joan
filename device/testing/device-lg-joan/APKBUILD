@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lg-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=22
+pkgrel=23
 url="https://postmarketos.org"
 license="MIT"
 provides="device-lge-joan=$pkgver-r$pkgrel"
@@ -23,6 +23,7 @@ depends="
 	linux-lg-joan
 	mkbootimg
 	neard
+	nfc-tags
 	pipewire-alsa
 	pipewire-echo-cancel
 	pipewire-pulse
@@ -75,7 +76,8 @@ package() {
 
 	# Default apps for hardware the V30 has, beyond the UI's own set
 	# (calls, chatty and snapshot come with phosh): a voice recorder, a
-	# per-application volume panel, and neard for the PN547 NFC controller.
+	# per-application volume panel, and neard plus the NFC Tags reader/writer
+	# for the PN547 NFC controller.
 	install -Dm644 "$srcdir"/90-lg-joan.preset \
 		"$pkgdir"/usr/lib/systemd/system-preset/90-lg-joan.preset
 	install -Dm644 "$srcdir"/org.neard.service \

@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""NFC Tags: read and write NFC tags through neard's D-Bus API.
+
+A small GTK4/libadwaita front end for neard (org.neard). Scanning starts
+neard's poll loop in initiator mode; each tag neard reports is listed with
+its NDEF records, and a URL or plain-text record can be written to the
+tag most recently detected. neard is D-Bus activated, so the first call
+starts it.
+"""
+import sys
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
+
+APP_ID = "io.github.ShapeShifter499.NfcTags"
+BUS = "org.neard"
+ADAPTER_IF = "org.neard.Adapter"
+TAG_IF = "org.neard.Tag"
+RECORD_IF = "org.neard.Record"
+RECORD_FIELDS = ("Type", "Representation", "URI", "MIMEType", "Encoding",
+                 "Language", "Action", "Size")
+
+
+def unpack(props):
+    """GLib.Variant a{sv} (or dict of Variants) to a plain dict."""
+    if isinstance(props, GLib.Variant):
+        return props.unpack()
+    return {k: (v.unpack() if isinstance(v, GLib.Variant) else v)
+            for k, v in props.items()}
+
+
+class NfcWindow(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="NFC Tags")
+        self.set_default_size(360, 640)
+        self.bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        self.adapter = None          # object path of the first adapter
+        self.tags = {}               # tag path -> props
+        self.records = {}            # record path -> props
+        self.last_tag = None
+
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        toolbar.add_top_bar(header)
+        self.toasts = Adw.ToastOverlay()
+        toolbar.set_content(self.toasts)
+        self.set_content(toolbar)
+
+        page = Adw.PreferencesPage()
+        self.toasts.set_child(page)
+
+        status = Adw.PreferencesGroup(title="Reader")
+        page.add(status)
+        self.state_row = Adw.ActionRow(title="Adapter", subtitle="Looking for neard…")
+        status.add(self.state_row)
+        self.scan_row = Adw.SwitchRow(title="Scan for tags",
+                                      subtitle="Hold a tag to the back of the phone")
+        self.scan_row.connect("notify::active", self.on_scan_toggled)
+        status.add(self.scan_row)
+
+        self.tag_group = Adw.PreferencesGroup(title="Tags",
+                                              description="Nothing detected yet")
+        page.add(self.tag_group)
+        self.tag_rows = []
+
+        write = Adw.PreferencesGroup(title="Write",
+                                     description="Writes to the last tag detected")
+        page.add(write)
+        self.kind = Adw.ComboRow(title="Record type",
+                                 model=Gtk.StringList.new(["URL", "Text"]))
+        write.add(self.kind)
+        self.payload = Adw.EntryRow(title="Content")
+        write.add(self.payload)
+        self.write_btn = Gtk.Button(label="Write to tag", sensitive=False,
+                                    margin_top=12)
+        self.write_btn.add_css_class("suggested-action")
+        self.write_btn.connect("clicked", self.on_write)
+        write.add(self.write_btn)
+
+        self.bus.signal_subscribe(BUS, "org.freedesktop.DBus.ObjectManager",
+                                  "InterfacesAdded", "/", None,
+                                  Gio.DBusSignalFlags.NONE, self.on_added)
+        self.bus.signal_subscribe(BUS, "org.freedesktop.DBus.ObjectManager",
+                                  "InterfacesRemoved", "/", None,
+                                  Gio.DBusSignalFlags.NONE, self.on_removed)
+        self.bus.signal_subscribe(BUS, "org.freedesktop.DBus.Properties",
+                                  "PropertiesChanged", None, ADAPTER_IF,
+                                  Gio.DBusSignalFlags.NONE, self.on_adapter_changed)
+        GLib.idle_add(self.load_objects)
+
+    # --- D-Bus helpers -------------------------------------------------
+    def call(self, path, iface, method, args=None, reply=None):
+        try:
+            return self.bus.call_sync(BUS, path, iface, method, args, reply,
+                                      Gio.DBusCallFlags.NONE, 10000, None)
+        except GLib.Error as e:
+            self.toast(e.message.split(":")[-1].strip() or e.message)
+            return None
+
+    def toast(self, text):
+        self.toasts.add_toast(Adw.Toast(title=text, timeout=4))
+
+    def set_prop(self, path, iface, name, value):
+        return self.call(path, "org.freedesktop.DBus.Properties", "Set",
+                         GLib.Variant("(ssv)", (iface, name, value)))
+
+    # --- object tracking ----------------------------------------------
+    def load_objects(self):
+        res = self.call("/", "org.freedesktop.DBus.ObjectManager",
+                        "GetManagedObjects", None,
+                        GLib.VariantType("(a{oa{sa{sv}}})"))
+        if res is None:
+            self.state_row.set_subtitle("neard is not available")
+            return False
+        for path, ifaces in res.unpack()[0].items():
+            self.track(path, ifaces)
+        self.refresh()
+        return False
+
+    def track(self, path, ifaces):
+        if ADAPTER_IF in ifaces and self.adapter is None:
+            self.adapter = path
+            self.adapter_props = dict(ifaces[ADAPTER_IF])
+        if TAG_IF in ifaces:
+            self.tags[path] = dict(ifaces[TAG_IF])
+            self.last_tag = path
+        if RECORD_IF in ifaces:
+            self.records[path] = dict(ifaces[RECORD_IF])
+
+    def on_added(self, _c, _s, _p, _i, _sig, params):
+        path, ifaces = params.unpack()
+        self.track(path, ifaces)
+        if TAG_IF in ifaces:
+            self.toast("Tag detected")
+        self.refresh()
+
+    def on_removed(self, _c, _s, _p, _i, _sig, params):
+        path, _ifaces = params.unpack()
+        self.tags.pop(path, None)
+        self.records.pop(path, None)
+        if self.last_tag == path:
+            self.last_tag = None
+        self.refresh()
+
+    def on_adapter_changed(self, _c, _s, path, _i, _sig, params):
+        iface, changed, _inv = params.unpack()
+        if path == self.adapter:
+            self.adapter_props.update(changed)
+            self.refresh()
+
+    # --- UI ------------------------------------------------------------
+    def refresh(self):
+        if self.adapter:
+            p = self.adapter_props
+            mode = "polling" if p.get("Polling") else p.get("Mode", "idle").lower()
+            power = "on" if p.get("Powered") else "off"
+            self.state_row.set_title(self.adapter.rsplit("/", 1)[-1])
+            self.state_row.set_subtitle(f"Power {power}, {mode}")
+            self.scan_row.handler_block_by_func(self.on_scan_toggled)
+            self.scan_row.set_active(bool(p.get("Polling")))
+            self.scan_row.handler_unblock_by_func(self.on_scan_toggled)
+        for row in self.tag_rows:
+            self.tag_group.remove(row)
+        self.tag_rows = []
+        for tpath, tprops in sorted(self.tags.items()):
+            row = Adw.ExpanderRow(
+                title=f"{tprops.get('Type', 'Tag')} ({tprops.get('Protocol', '?')})",
+                subtitle="read-only" if tprops.get("ReadOnly") else "writable")
+            for rpath, r in sorted(self.records.items()):
+                if not rpath.startswith(tpath + "/"):
+                    continue
+                main = r.get("URI") or r.get("Representation") or r.get("MIMEType") or ""
+                detail = ", ".join(f"{k}: {r[k]}" for k in RECORD_FIELDS
+                                   if k in r and k not in ("URI", "Representation"))
+                rec = Adw.ActionRow(title=main or r.get("Type", "record"),
+                                    subtitle=detail)
+                rec.set_title_selectable(True)
+                row.add_row(rec)
+            row.set_expanded(True)
+            self.tag_group.add(row)
+            self.tag_rows.append(row)
+        self.tag_group.set_description(None if self.tags else "Nothing detected yet")
+        writable = self.last_tag and not self.tags.get(self.last_tag, {}).get("ReadOnly")
+        self.write_btn.set_sensitive(bool(writable))
+
+    def on_scan_toggled(self, row, _pspec):
+        if not self.adapter:
+            return
+        if row.get_active():
+            if not self.adapter_props.get("Powered"):
+                self.set_prop(self.adapter, ADAPTER_IF, "Powered", GLib.Variant("b", True))
+            self.call(self.adapter, ADAPTER_IF, "StartPollLoop",
+                      GLib.Variant("(s)", ("Initiator",)))
+        else:
+            self.call(self.adapter, ADAPTER_IF, "StopPollLoop")
+
+    def on_write(self, _btn):
+        text = self.payload.get_text().strip()
+        if not (self.last_tag and text):
+            self.toast("Nothing to write")
+            return
+        if self.kind.get_selected() == 0:
+            rec = {"Type": GLib.Variant("s", "URI"), "URI": GLib.Variant("s", text)}
+        else:
+            rec = {"Type": GLib.Variant("s", "Text"),
+                   "Encoding": GLib.Variant("s", "UTF-8"),
+                   "Language": GLib.Variant("s", "en"),
+                   "Representation": GLib.Variant("s", text)}
+        if self.call(self.last_tag, TAG_IF, "Write",
+                     GLib.Variant("(a{sv})", (rec,))) is not None:
+            self.toast("Written")
+
+
+class NfcApp(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID)
+
+    def do_activate(self):
+        win = self.props.active_window or NfcWindow(self)
+        win.present()
+
+
+if __name__ == "__main__":
+    sys.exit(NfcApp().run(sys.argv))

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=NFC Tags
+Comment=Read and write NFC tags
+Exec=nfc-tags
+Icon=nfc-symbolic
+Terminal=false
+Categories=Utility;
+Keywords=nfc;tag;ndef;
+X-Purism-FormFactor=Workstation;Mobile;
