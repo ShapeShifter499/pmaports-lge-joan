@@ -88,6 +88,13 @@ sudo rc-service joan-imsd start
 joan-ims dial +19165550100
 ```
 
+**Incoming calls are declined, not answered.** While joan-imsd is registered
+it answers each incoming INVITE with `480 Temporarily Unavailable`, so the
+network sends the caller to voicemail. Nothing on the phone can ring or pick up
+a VoLTE call yet, and auto-answering would hand callers a silent, connected
+call the user never sees. For bench work only, `JOAN_IMS_AUTOANSWER=1` restores
+the old answer-and-hold behaviour.
+
 Phosh **Calls** is installed (`calls` package) so the phone looks like
 every other pmOS device. Its ModemManager backend still talks **CS
 voice** (QMI Voice). T-Mobile US has no CS. Until an MM IMS Voice

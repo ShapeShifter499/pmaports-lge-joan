@@ -411,6 +411,15 @@ def listen_incoming(sa: EspSa, *, src: str, port_c: int, iface: str = "qmapmux0.
         print("RX", line0[:90], "LEN", len(t))
         if line0.startswith("INVITE "):
             sa.send(sip_response(t, 100, "Trying", to_tag=our_tag, src=src, port_c=port_c))
+            if os.environ.get("JOAN_IMS_AUTOANSWER") != "1":
+                # Nothing on the phone can ring or let the user pick up yet
+                # (no ModemManager IMS voice path), so a call answered here
+                # is a silent call the user never sees. Decline instead, and
+                # the network sends the caller to voicemail. Bench sessions
+                # that want the old auto-answer set JOAN_IMS_AUTOANSWER=1.
+                sa.send(sip_response(t, 480, "Temporarily Unavailable", to_tag=our_tag, src=src, port_c=port_c))
+                print("INCOMING_DECLINED_480")
+                continue
             sa.send(sip_response(t, 180, "Ringing", to_tag=our_tag, src=src, port_c=port_c))
             print("INCOMING_RING")
             sdp = (
