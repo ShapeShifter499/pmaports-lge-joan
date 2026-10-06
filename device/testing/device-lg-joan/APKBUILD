@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lg-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=23
+pkgrel=24
 url="https://postmarketos.org"
 license="MIT"
 provides="device-lge-joan=$pkgver-r$pkgrel"
@@ -45,6 +45,7 @@ source="deviceinfo
 	90-joan-bfq.rules
 	joan-dconf-profile
 	00-joan-performance
+	60-joan-gst-rank.conf
 	90-lg-joan.preset
 	73-joan-feedbackd.rules
 	org.neard.service
@@ -64,6 +65,11 @@ package() {
 	# BFQ for the microSD the SD-flavour rootfs lives on
 	install -Dm644 "$srcdir"/90-joan-bfq.rules \
 		"$pkgdir"/usr/lib/udev/rules.d/90-joan-bfq.rules
+
+	# Keep GStreamer away from the Venus H.264 encoder until its EOS fix
+	# lands (see the file header; the SoC resets when the firmware asserts).
+	install -Dm644 "$srcdir"/60-joan-gst-rank.conf \
+		"$pkgdir"/etc/environment.d/60-joan-gst-rank.conf
 
 	# Lock-gated display scale: scale 2 while locked, native when unlocked.
 	install -Dm755 "$srcdir"/joan-lock-scale \
@@ -110,6 +116,7 @@ ab2f4f75d34677222d39b7dd79229143fd1c65e613bf71773368d004a74e6a15cddbcca42a81a073
 ce6ea306df8497e229cb598eff1dc9c29777900583aad7f46ac878bc00b46fcca16097e7673708639356f8b98fec6ff393623a8ab2ef6e765fb03be9767b4430  90-joan-bfq.rules
 6e23b525531b94e6b40f2118570b7e162b3e41a4a2c33f99b1a1cba5fa9e65f53048c382c6fd1196a6421ab4c40206dc995a726ac157480b85623ab4164418ad  joan-dconf-profile
 f85c89c67727bb8ed01c80b21466527c371a280a70a9a6fb336b52219e0239232b55e97fdc8a6964f0849f81ee9cbea759c2c6a6d26d8f31eb64acd4ccf0af5e  00-joan-performance
+6f16fa37174461cc3929b6d7129a76c1b0564300c05555a6e3acd792128718ad349982f36397f1e48be7858a9724970dd9049e95562242f24472cd496da8e181  60-joan-gst-rank.conf
 aa76e1f24ed8c7ed2527c10fde44b5d13a0e9d14b1a939a4cb72254e2593772cd19852f8ec7320a2f83a833aaffe0ef18bb941ec3aa9f350136c3698a2429656  90-lg-joan.preset
 2f2044e35d830cb3333277105df3b7e1071ac4b00aebc06e72f05bd6cd8ee4de0bd554be3f662de344346a423f1df411b107888c86bf0708845e953a71a0d0fa  73-joan-feedbackd.rules
 7b2632a017b291a84c15694a52afc56c57cb5d79ad48bd217078ff75b35904abad0dba4c3e5ff258adad125a7cd2619033782ec14e52572f85568377764b4dea  org.neard.service
