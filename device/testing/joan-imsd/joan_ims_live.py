@@ -73,7 +73,117 @@ def ipv6_list(blob):
     return out
 
 
-def wds_pcscf():
+QRTR_PORT_CTRL = 0xFFFFFFFE
+QRTR_TYPE_NEW_SERVER = 4
+QRTR_TYPE_NEW_LOOKUP = 10
+QMI_SERVICE_WDS = 1
+
+
+def qrtr_lookup(service: int, instance: int = 0) -> list[tuple[int, int]]:
+    """(node, port) of every QRTR server for `service`, via the name service.
+
+    Ports are assigned at runtime, so a fixed (node, port) breaks across
+    boots: on 2026-10-06 port 57 was UIM and WDS was on 60.
+    """
+    s = socket.socket(42, socket.SOCK_DGRAM)  # AF_QIPCRTR
+    s.settimeout(3)
+    try:
+        node = s.getsockname()[0]
+        s.sendto(struct.pack("<5I", QRTR_TYPE_NEW_LOOKUP, service, instance, 0, 0),
+                 (node, QRTR_PORT_CTRL))
+        found = []
+        while True:
+            data = s.recv(64)
+            if len(data) < 20:
+                break
+            cmd, svc, _ins, n, port = struct.unpack_from("<5I", data)
+            if cmd != QRTR_TYPE_NEW_SERVER or (svc == 0 and n == 0 and port == 0):
+                break
+            if svc == service:
+                found.append((n, port))
+        return found
+    except OSError:
+        return []
+    finally:
+        s.close()
+
+
+def iface_mux_id(iface: str) -> int | None:
+    """rmnet mux id of a multiplexed data interface (ip -d link)."""
+    try:
+        out = subprocess.check_output(["ip", "-d", "link", "show", iface], text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"\bmux_id (\d+)", out)
+    return int(m.group(1)) if m else None
+
+
+def global_ipv6(iface: str) -> str | None:
+    """First usable global IPv6 address on iface (any carrier prefix)."""
+    try:
+        out = subprocess.check_output(["ip", "-6", "-o", "addr", "show", "dev", iface,
+                                       "scope", "global"], text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in out.splitlines():
+        if any(f in line for f in ("tentative", "dadfailed", "deprecated")):
+            continue
+        parts = line.split()
+        if "inet6" in parts:
+            return parts[parts.index("inet6") + 1].split("/")[0]
+    return None
+
+
+def mm_kv(*args: str) -> dict[str, str]:
+    out = subprocess.check_output(["mmcli", *args, "-K"], text=True, timeout=15)
+    kv = {}
+    for line in out.splitlines():
+        if " : " in line:
+            k, v = line.split(" : ", 1)
+            kv[k.strip()] = v.strip()
+    return kv
+
+
+def _is_ims_bearer(b: dict[str, str]) -> bool:
+    apn = b.get("bearer.properties.apn", "").lower()
+    types = [t.strip() for t in b.get("bearer.properties.apn-type", "").lower().split(",")]
+    return apn == "ims" or "ims" in types
+
+
+def find_ims_bearer() -> tuple[str | None, str | None]:
+    """(bearer path, interface) of a connected IMS bearer, or (None, None)."""
+    m = mm_kv("-m", "any")
+    for k, path in m.items():
+        if not k.startswith("modem.generic.bearers.value"):
+            continue
+        b = mm_kv("-b", path)
+        iface = b.get("bearer.status.interface", "--")
+        if _is_ims_bearer(b) and b.get("bearer.status.connected") == "yes" and iface != "--":
+            return path, iface
+    return None, None
+
+
+def ensure_ims_bearer() -> tuple[str | None, str | None]:
+    """Find the IMS bearer, or create and connect one (apn=ims, IPv6, multiplexed)."""
+    path, iface = find_ims_bearer()
+    if iface:
+        return path, iface
+    out = subprocess.check_output(
+        ["mmcli", "-m", "any",
+         "--create-bearer=apn=ims,apn-type=ims,ip-type=ipv6,multiplex=requested"],
+        text=True, timeout=30)
+    m = re.search(r"(/org/freedesktop/ModemManager1/Bearer/\d+)", out)
+    if not m:
+        return None, None
+    subprocess.check_output(["mmcli", "-b", m.group(1), "--connect"], text=True, timeout=60)
+    return find_ims_bearer()
+
+
+def wds_pcscf(mux_id: int):
+    servers = qrtr_lookup(QMI_SERVICE_WDS)
+    if not servers:
+        return [], None
+    wds = servers[0]
     s = socket.socket(42, socket.SOCK_DGRAM)
     s.settimeout(5)
 
@@ -86,11 +196,11 @@ def wds_pcscf():
         return None
 
     s.sendto(
-        qmi_req(0x00A2, tlv(0x10, struct.pack("<II", 4, 1)) + tlv(0x11, struct.pack("<B", 2)), 1),
-        (0, 57),
+        qmi_req(0x00A2, tlv(0x10, struct.pack("<II", 4, 1)) + tlv(0x11, struct.pack("<B", mux_id)), 1),
+        wds,
     )
     recv_want(0x00A2)
-    s.sendto(qmi_req(0x002D, b"", 2), (0, 57))
+    s.sendto(qmi_req(0x002D, b"", 2), wds)
     gc = recv_want(0x002D)
     if not gc or qmi_res(gc) != (0, 0):
         return [], None
@@ -357,7 +467,7 @@ def sip_response(req: str, code: int, reason: str, *, to_tag: str, src: str, por
     return ("\r\n".join(lines) + "\r\n\r\n").encode()
 
 
-def listen_incoming(sa: EspSa, *, src: str, port_c: int, iface: str = "qmapmux0.1") -> int:
+def listen_incoming(sa: EspSa, *, src: str, port_c: int, iface: str) -> int:
     our_tag = uuid.uuid4().hex[:10]
     udp_socks = []
     for p in (5060, port_c, 16000):
@@ -446,6 +556,7 @@ def listen_incoming(sa: EspSa, *, src: str, port_c: int, iface: str = "qmapmux0.
                 rtp_thr = threading.Thread(
                     target=send_pcmu,
                     args=(src, sdp_info["ip"], sdp_info["port"], stop),
+                    kwargs={"iface": iface},
                     daemon=True,
                 )
                 rtp_thr.start()
@@ -490,14 +601,15 @@ def parse_sdp(text: str) -> dict:
     return info
 
 
-def send_pcmu(src: str, dest_ip: str, dest_port: int, stop, path="/tmp/aurel-vm.ulaw", iface="qmapmux0.1"):
+def send_pcmu(src: str, dest_ip: str, dest_port: int, stop, path="/tmp/aurel-vm.ulaw", iface=None):
     data = open(path, "rb").read()
     fam = socket.AF_INET6 if ":" in dest_ip else socket.AF_INET
     sock = socket.socket(fam, socket.SOCK_DGRAM)
-    try:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, iface.encode() + b"\x00")
-    except OSError as e:
-        print("RTP_BINDDEV", type(e).__name__)
+    if iface:
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, iface.encode() + b"\x00")
+        except OSError as e:
+            print("RTP_BINDDEV", type(e).__name__)
     sock.bind((src, 40000))
     seq = 0
     ts = 0
@@ -675,18 +787,13 @@ def main() -> int:
         elif argv[0].startswith("+") or argv[0].startswith("sip:"):
             mode = "dial"
             number = argv[0]
-    out = subprocess.check_output(["mmcli", "-b", "2"], text=True)
-    iface = None
-    for line in out.splitlines():
-        if "interface:" in line:
-            iface = line.split(":", 1)[1].strip()
-    show = subprocess.check_output(["ip", "-6", "addr", "show", iface], text=True)
-    src = None
-    for line in show.splitlines():
-        if "inet6 2607:" in line and "tentative" not in line and "dadfailed" not in line:
-            src = line.split()[1].split("/")[0]
-            break
-    pcs, gw = wds_pcscf()
+    _bearer, iface = ensure_ims_bearer()
+    if not iface:
+        print("NO_IMS_BEARER")
+        return 2
+    mux_id = iface_mux_id(iface)
+    src = global_ipv6(iface)
+    pcs, gw = wds_pcscf(mux_id) if mux_id is not None else ([], None)
     if not (src and pcs and gw):
         print("MISSING", bool(src), bool(pcs), bool(gw))
         return 2
@@ -934,6 +1041,7 @@ def main() -> int:
             rtp_thr = threading.Thread(
                 target=send_pcmu,
                 args=(src, last_sdp["ip"], last_sdp["port"], stop),
+                kwargs={"iface": iface},
                 daemon=True,
             )
             rtp_thr.start()
