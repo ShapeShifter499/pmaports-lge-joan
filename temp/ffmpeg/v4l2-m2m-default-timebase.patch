@@ -1,0 +1,36 @@
+From: Lance <Gero3977@gmail.com>
+Subject: [PATCH] avcodec/v4l2_buffers: default to microseconds when no timebase is set
+
+v4l2_get_timebase() returns pkt_timebase if set and time_base otherwise.
+A caller that sets neither (both default to 0/1) gets every V4L2 buffer
+timestamp written as pts * 0/1 = 0, and reading it back divides by zero
+in av_rescale_q(), so every decoded frame has pts == AV_NOPTS_VALUE.
+
+Firefox's V4L2-DRM path (FFmpegVideoDecoder::InitV4L2Decoder) sets
+neither and passes microsecond timestamps. With h264_v4l2m2m on a
+Qualcomm Venus decoder it gets a frame with pts=-9223372036854775808,
+flushes, and falls back to software decoding.
+
+Fall back to the V4L2 timestamp unit itself (microseconds, as
+AV_TIME_BASE_Q) when
+neither timebase is set.
+
+Signed-off-by: Lance <Gero3977@gmail.com>
+Assisted-by: Claude-Code:claude-opus-5-5
+---
+ libavcodec/v4l2_buffers.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+--- a/libavcodec/v4l2_buffers.c
++++ b/libavcodec/v4l2_buffers.c
+@@ -58,7 +58,9 @@ static inline AVRational v4l2_get_timebase(V4L2Buffer *avbuf)
+ 
+     if (s->avctx->pkt_timebase.num)
+         return s->avctx->pkt_timebase;
+-    return s->avctx->time_base;
++    if (s->avctx->time_base.num)
++        return s->avctx->time_base;
++    return v4l2_timebase; /* microseconds */
+ }
+ 
+ static inline void v4l2_set_pts(V4L2Buffer *out, int64_t pts)
