@@ -323,7 +323,7 @@ the joan UCM profile, and the VoLTE metapackage (`lg-joan-volte` →
 | audio | speaker, headphones (ES9218P), microphones through PipeWire + the joan UCM profile |
 | video | hardware decode (Venus) for GStreamer, FFmpeg and Firefox |
 | Wi-Fi / Bluetooth | WCN3990; stable MAC addresses from bootmac |
-| cellular | data auto-connects; VoLTE via joan-imsd is set up by hand (`FIRST-INSTALL-VOLTE.md`) |
+| cellular | data auto-connects and comes back after reconnects, modem restarts and Wi-Fi hand-offs; IPv6-only SIMs also get IPv4 through 464XLAT (`clatd`, only when the network offers NAT64 and no native IPv4); VoLTE via joan-imsd is set up by hand (`FIRST-INSTALL-VOLTE.md`) |
 | camera | rear IMX351 captures through libcamera; Snapshot on screen not yet confirmed |
 | NFC | PN547 with neard; `nfc-tags` app |
 | FM radio | tuner works (`/dev/radio0`); no audio path yet |
