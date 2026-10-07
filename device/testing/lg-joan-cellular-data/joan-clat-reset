@@ -1,0 +1,24 @@
+#!/bin/sh
+# ExecStartPre for clatd.service: clear state a killed clatd leaves behind.
+# Without this, a stale "default dev clat" route makes clatd's IPv4 check
+# think native IPv4 exists (so it exits), and a stale prio-0 rule makes its
+# "ip -6 rule add" fail with EEXIST.
+route_table=49575	# clatd default; keep in sync with /etc/clatd.conf
+
+ip link del clat 2>/dev/null
+nft delete table ip6 clatd 2>/dev/null
+while ip -6 rule del table "$route_table" 2>/dev/null; do :; done
+
+# joan-clat-up source rules: prio 1, "from <addr>" (never "from all").
+ip -6 rule show prio 1 | awk '$2 == "from" && $3 != "all" { print $3, $5 }' |
+	while read -r src tbl; do ip -6 rule del prio 1 from "$src" lookup "$tbl"; done
+nft -a list chain inet filter forward 2>/dev/null |
+	awk '/comment "clatd"/ { print $NF }' |
+	while read -r h; do nft delete rule inet filter forward handle "$h"; done
+
+# clatd moves the "local" rule from prio 0 to 1 while running; put it back.
+if ! ip -6 rule show prio 0 table local | grep -q . &&
+	ip -6 rule show prio 1 table local | grep -q .; then
+	ip -6 rule add prio 0 table local && ip -6 rule del prio 1 table local
+fi
+exit 0

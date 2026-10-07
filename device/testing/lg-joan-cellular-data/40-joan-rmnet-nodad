@@ -1,0 +1,25 @@
+#!/bin/sh
+# NetworkManager dispatcher: rescue IPv6 on the modem data netdev from DAD.
+#
+# Every cellular (re)connect makes ModemManager create a fresh rmnet link
+# (qmapmux*). NetworkManager adds the carrier's address right away, often
+# before udev's 70-joan-rmnet-nodad.rules has set accept_dad=0, so the
+# kernel runs DAD and can mark the address dadfailed: IPv6 (and with it the
+# CLAT) stays dead until the next reconnect. On "up", turn DAD off and re-add
+# any tentative/dadfailed address with nodad. Runs before 50-clatd.
+[ "$2" = "up" ] || exit 0
+iface=$DEVICE_IP_IFACE
+case "$iface" in
+qmapmux* | rmnet*) ;;
+*) exit 0 ;;
+esac
+
+echo 0 >"/proc/sys/net/ipv6/conf/$iface/accept_dad" 2>/dev/null
+ip -6 -o addr show dev "$iface" scope global tentative |
+	awk '{ print $4 }' |
+	while read -r addr; do
+		logger -t joan-rmnet-nodad "$iface: re-adding $addr without DAD"
+		ip -6 addr del "$addr" dev "$iface" &&
+			ip -6 addr add "$addr" dev "$iface" nodad noprefixroute
+	done
+exit 0

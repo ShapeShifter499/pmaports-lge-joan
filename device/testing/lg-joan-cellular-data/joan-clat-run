@@ -1,0 +1,43 @@
+#!/bin/sh
+# ExecStart for clatd.service: run clatd's RFC 7050 PLAT discovery against
+# the current network's own DNS servers instead of the systemd-resolved stub.
+#
+# Through resolved, discovery is a single AAAA lookup that fails in two
+# windows around every (re)connect, and clatd then exits 0 for good:
+#  - before NetworkManager has pushed the link's servers, resolved answers
+#    from its fallback servers, which never synthesise DNS64;
+#  - with DNSSEC=allow-downgrade, resolved queries a new server with DO+CD
+#    until it learns the server can't validate, and a DNS64 server answers
+#    such queries unsynthesised (RFC 6147 section 5.5), i.e. no AAAA at all.
+#    Seen live on T-Mobile US: fd00:976a::9 returns an empty AAAA answer to
+#    DO+CD, fd00:976a::10 does not.
+# RFC 7050 section 3 asks for exactly this: query the network's DNS64
+# servers with DO unset (clatd clears it).
+#
+# The servers are re-read from systemd-resolved at every start, so SIM swaps,
+# roaming and Wi-Fi <-> cellular work unchanged: NetworkManager's dispatcher
+# (50-clatd) restarts this service on every connection up/down. Whether a
+# CLAT is needed at all stays clatd's decision (native IPv4 or no DNS64 ->
+# it exits).
+
+# Wait (max 45s) until at least one link's servers answer. ipv4only.arpa
+# always has A records, so an uncached A answer proves the link's DNS works.
+servers=
+deadline=$(($(date +%s) + 45))
+while [ "$(date +%s)" -lt "$deadline" ]; do
+	servers=$(resolvectl dns 2>/dev/null |
+		sed -nE 's/^Link [0-9]+ \(([^)]+)\): ([0-9a-fA-F:.].*)/\1 \2/p' |
+		while read -r link srv; do
+			timeout 5 resolvectl query --cache=no --legend=no \
+				-i "$link" -t A ipv4only.arpa >/dev/null 2>&1 &&
+				echo "$srv"
+		done | tr ' ' '\n' | sed 's/#.*//' | grep . | paste -sd, -)
+	[ -n "$servers" ] && break
+	sleep 1
+done
+
+if [ -n "$servers" ]; then
+	exec /usr/bin/clatd "dns64-servers=$servers"
+fi
+echo "joan-clat-run: no link DNS answered after 45s, using the system resolver" >&2
+exec /usr/bin/clatd

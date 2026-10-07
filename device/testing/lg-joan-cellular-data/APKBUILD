@@ -1,26 +1,64 @@
 # Maintainer: Lance <Gero3977@gmail.com>
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=lg-joan-cellular-data
-pkgver=0.1
-pkgrel=1
-pkgdesc="LG V30 (joan) cellular data defaults — rmnet DAD workaround + NetworkManager profile"
+pkgver=0.2
+pkgrel=6
+pkgdesc="LG V30 (joan) cellular data defaults — rmnet DAD workaround, NetworkManager profile, IPv4 on IPv6-only SIMs (464XLAT)"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
 license="MIT"
-depends="networkmanager modemmanager mobile-broadband-provider-info"
+# clatd: CLAT client by Tore Anderson (MIT), https://github.com/toreanderson/clatd
+depends="
+	clatd
+	iproute2
+	mobile-broadband-provider-info
+	modemmanager
+	networkmanager
+	nftables
+	"
+subpackages="$pkgname-systemd:systemd_unit"
 options="!check"
 source="
+	40-joan-rmnet-nodad
 	70-joan-rmnet-nodad.rules
 	lg-joan-cellular-data.nmconnection
+	clatd.conf
+	clatd.service
+	joan-clat-down
+	joan-clat-reset
+	joan-clat-up
+	joan-clat-run
 	"
 
 package() {
+	install -Dm755 "$srcdir/40-joan-rmnet-nodad" \
+		"$pkgdir/usr/lib/NetworkManager/dispatcher.d/40-joan-rmnet-nodad"
 	install -Dm644 "$srcdir/70-joan-rmnet-nodad.rules" \
 		"$pkgdir/etc/udev/rules.d/70-joan-rmnet-nodad.rules"
 	install -Dm600 "$srcdir/lg-joan-cellular-data.nmconnection" \
 		"$pkgdir/usr/lib/NetworkManager/system-connections/lg-joan-cellular-data.nmconnection"
+	install -Dm644 "$srcdir/clatd.conf" "$pkgdir/etc/clatd.conf"
+	install -Dm755 -t "$pkgdir/usr/libexec/$pkgname" \
+		"$srcdir/joan-clat-down" \
+		"$srcdir/joan-clat-reset" \
+		"$srcdir/joan-clat-up" \
+		"$srcdir/joan-clat-run"
+}
+
+systemd_unit() {
+	pkgdesc="systemd service for clatd (started by the NetworkManager dispatcher)"
+	install_if="$pkgname=$pkgver-r$pkgrel systemd"
+	install -Dm644 "$srcdir/clatd.service" \
+		"$subpkgdir/usr/lib/systemd/system/clatd.service"
 }
 sha512sums="
+4b29d2b6843b7b0430670468ac0c377e8392d1baf742e4462275b287e85db51b2274fdd594b6c570847091a8718a52cdb3a8dbccb8431b112081705e8910cccc  40-joan-rmnet-nodad
 76fae02a9453a2536600535c9e35af6e10f6189e5db1091c14c2b3673e9848abfc93ee996fa5ea73e005703e9c1ec9963190b81edb4b640653ccf8023bbd4414  70-joan-rmnet-nodad.rules
 ca9d4ca011ecd8bbd1c1437d3ef1d0a9f6610ef0a7820ef880bd88e36a51d069e38d5922a676a487fe1e48a73c02f45ab30e3e7523065e636275ec57743163c3  lg-joan-cellular-data.nmconnection
+a075adde96a59683e9bfb8a2753c1fd8f90224d4075a2ac0077f90c5a96900e42aea12d31a7e3a8bbef0006d6b3c99dd14927a69f9a677589d9c249d08902ba9  clatd.conf
+05f9edb3d984a8dee962135a93cdfeb2d79e6339b056da6a4616eec63d2265412dea853555126d2c0c6855040ed489c2da4ed4c1356e97b0b4df7b80ab59c7c4  clatd.service
+ee67bf031f1d073a3c187ccf04823c4478af4119a0d84cdce81242c8ab359bc971027d664a244fe83e15ca48a955d63d7b47513b718e97827c2c2e59e7908f75  joan-clat-down
+df427b8a3137d3bfa6dea04109011bffee46032667d3a8c15a6efe350e6a5211849177bb7fdf12692db0f635f012684d7837c1e55e7f4a70798ccd1847c8c46f  joan-clat-reset
+bd66d0ca0bbafb647665480fbe14567d17258c642f15959612a4a89d96cc46427439ee66887a986d117bfea6c99e7eed7e37b4733a900321168f367f4e5413b7  joan-clat-up
+b533a0aba776fd90597a397dd8517c4f39bc340498d956fbb5a49ae7aee01fafc2a1b10250cf688d761a60ba60225ba703dd056e2b6090aabbddedba9c81cdda  joan-clat-run
 "

@@ -1,0 +1,9 @@
+#!/bin/sh
+# clatd script-down hook: undo joan-clat-up (see there for why).
+set -u
+: "${clat_v6_addr:?}"
+while ip -6 rule del prio 1 from "$clat_v6_addr" 2>/dev/null; do :; done
+nft -a list chain inet filter forward 2>/dev/null |
+	awk '/comment "clatd"/ { print $NF }' |
+	while read -r h; do nft delete rule inet filter forward handle "$h"; done
+exit 0

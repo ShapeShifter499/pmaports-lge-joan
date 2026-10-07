@@ -1,0 +1,20 @@
+# Based on scripts/clatd.systemd from clatd by Tore Anderson (MIT),
+# https://github.com/toreanderson/clatd
+# Not enabled at boot: NetworkManager's dispatcher (50-clatd) starts and
+# restarts it whenever a connection goes up or down.
+
+[Unit]
+Description=464XLAT CLAT daemon
+Documentation=man:clatd(8)
+Wants=network-online.target
+After=network-online.target
+After=nss-lookup.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStartPre=/usr/libexec/lg-joan-cellular-data/joan-clat-reset
+ExecStart=/usr/libexec/lg-joan-cellular-data/joan-clat-run
+
+[Install]
+WantedBy=multi-user.target

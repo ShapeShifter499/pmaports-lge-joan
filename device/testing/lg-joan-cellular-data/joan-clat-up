@@ -1,0 +1,35 @@
+#!/bin/sh
+# clatd script-up hook for postmarketOS cellular (464XLAT on IPv6-only SIMs).
+#
+# clatd exports its config to this script as lowercase env vars with '-'
+# turned into '_' (clat_dev, plat_dev, clat_v6_addr, ...).
+#
+# Two pmOS defaults stop clatd's translated traffic from leaving the phone:
+#  1. postmarketos-base-ui-networkmanager puts modem routes in a separate
+#     table (1430), reached only through an "oif <modem dev>" rule. Packets
+#     that tayga writes back into the clat tun have no output interface yet,
+#     so they never match that rule. Route the CLAT IPv6 source through the
+#     same table.
+#  2. The pmOS nftables forward chain defaults to drop, and clat -> modem is
+#     forwarded traffic. Accept it for the clat device.
+# Every step is idempotent; joan-clat-down / joan-clat-reset undo them.
+set -u
+: "${clat_dev:?}" "${plat_dev:?}" "${clat_v6_addr:?}"
+
+tbl=$(ip -6 rule show | awk -v d="$plat_dev" '
+	{ for (i = 1; i < NF; i++) if ($i == "oif" && $(i + 1) == d) hit = 1 }
+	hit { for (i = 1; i < NF; i++) if ($i == "lookup") { print $(i + 1); exit } }')
+if [ -n "$tbl" ] && [ "$tbl" != "main" ] &&
+	! ip -6 rule show prio 1 | grep -q "from $clat_v6_addr lookup $tbl\$"; then
+	ip -6 rule add prio 1 from "$clat_v6_addr" lookup "$tbl"
+fi
+
+if nft list chain inet filter forward >/dev/null 2>&1; then
+	for dir in iifname oifname; do
+		nft list chain inet filter forward |
+			grep -q "$dir \"$clat_dev\" accept comment \"clatd\"" ||
+			nft insert rule inet filter forward \
+				"$dir" "$clat_dev" accept comment '"clatd"'
+	done
+fi
+exit 0
