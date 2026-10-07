@@ -1,7 +1,7 @@
 # Maintainer: Lance <Gero3977@gmail.com>
 pkgname=nfc-tags
 pkgver=0.1
-pkgrel=0
+pkgrel=1
 pkgdesc="Read and write NFC tags through neard (GTK4/libadwaita)"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -11,14 +11,18 @@ options="!check"
 source="
 	nfc-tags
 	io.github.ShapeShifter499.NfcTags.desktop
+	io.github.ShapeShifter499.NfcTags.svg
 	"
 
 package() {
 	install -Dm755 "$srcdir"/nfc-tags "$pkgdir"/usr/bin/nfc-tags
 	install -Dm644 "$srcdir"/io.github.ShapeShifter499.NfcTags.desktop \
 		"$pkgdir"/usr/share/applications/io.github.ShapeShifter499.NfcTags.desktop
+	install -Dm644 "$srcdir"/io.github.ShapeShifter499.NfcTags.svg \
+		"$pkgdir"/usr/share/icons/hicolor/scalable/apps/io.github.ShapeShifter499.NfcTags.svg
 }
 sha512sums="
 f4fe3243f324a52d5a2b7698dce04ec59cf0626125b7a073db3ec1af407e8afd070216fd33a3f530f948454519c03d8e7ee244fd5e92cc3783e02e73cbe1defe  nfc-tags
-8953e68e00120e248bf3ad61101fdeeb3903a9b61198f5c4f8473b60efd0627830e22c4bb37bb3b1a4e5ec3e1aed4f4085f246c01927eeb67037f98fa4d086be  io.github.ShapeShifter499.NfcTags.desktop
+ac9464bfd95a5dec8ecc94ce29acd783696639bde2675c52b0f956cb75679ef2b28fd5bfad0c5a2003e5353f9b9c9107ac3998c753d0c7a31d4de97e2efef90b  io.github.ShapeShifter499.NfcTags.desktop
+c63d91706e52914aa23916041465a91756a45e705528a20d928c80dd5dbcb561ec2a2d184deec4115c6789c2765e56c7978e906c5600ad3a2818dfc80766a96e  io.github.ShapeShifter499.NfcTags.svg
 "
