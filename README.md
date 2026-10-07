@@ -314,17 +314,29 @@ A first image already carries GPU/display, Bluetooth, WLAN and modem firmware,
 the joan UCM profile, and the VoLTE metapackage (`lg-joan-volte` →
 `joan-imsd`, ModemManager, 81voltd, rmtfs, Calls). Hardware status:
 
-| subsystem | state in this image |
+| subsystem | state in this image (linux-lg-joan r55, 2026-10-07) |
 |---|---|
-| display / GPU | enabled in the pinned kernel; device-verified in lab builds |
-| battery (FG %, charger) | enabled by the kernel config (r5+); FG verified on hardware, 2026-08-07 |
-| Bluetooth | driver + firmware + DT in image; device-verified on lab RAM boots only |
-| Wi-Fi (WCN3990) | driver + firmware + DT in image; scan + one association proven on lab RAM boots; disconnect/rekey hang is an open upstream-class bug |
-| cellular / VoLTE | stack installed and auto-enabled on systemd via presets; carried a live call on one network (lab build) |
+| display / GPU | panel, touch, backlight; Adreno 540 at 257–710 MHz (GLES 3.1) |
+| CPU | silver 300–1900.8 MHz, gold 300–2361.6 MHz all-core and 2457.6 MHz single-core (LG's rated bin-2 table), schedutil |
+| thermal | LG's policy: 85 °C core/GPU trips, DRAM throttle, skin ladder, charge current by skin temperature |
+| battery / charging | fuel gauge %, charging to 4395 mV, full-charge reported |
+| audio | speaker, headphones (ES9218P), microphones through PipeWire + the joan UCM profile |
+| video | hardware decode (Venus) for GStreamer, FFmpeg and Firefox |
+| Wi-Fi / Bluetooth | WCN3990; stable MAC addresses from bootmac |
+| cellular | data auto-connects; VoLTE via joan-imsd is set up by hand (`FIRST-INSTALL-VOLTE.md`) |
+| camera | rear IMX351 captures through libcamera; Snapshot on screen not yet confirmed |
+| NFC | PN547 with neard; `nfc-tags` app |
+| FM radio | tuner works (`/dev/radio0`); no audio path yet |
+| USB-C display | not working yet |
 
-**This image as a whole has not been device-qualified end-to-end.** Each row
-above was proven on lab RAM-boot builds; a qualification run of the exact
-published image is pending. First-boot IMS steps:
+Default apps added by `device-lg-joan` on top of Phosh's (Calls, Chatty,
+Snapshot, ...): `gnome-sound-recorder`, `pwvucontrol`, `nfc-tags`.
+
+A fresh `pmbootstrap install --no-split --sector-size 512` of this tree booted
+to Phosh on a US998 on 2026-10-06 (0 failed units, cellular data up). The
+up-to-date per-part table, with evidence, is
+[`docs/joan-hardware-support-matrix.md`](https://github.com/ShapeShifter499/lg-v30-port/blob/claude/lucid-dijkstra-bxx3r9/docs/joan-hardware-support-matrix.md)
+in lg-v30-port. First-boot IMS steps:
 `device/testing/lg-joan-volte/FIRST-INSTALL-VOLTE.md`.
 
 ## Caveats
