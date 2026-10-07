@@ -1,0 +1,10 @@
+# D-Bus activation for neard (NFC). Alpine's neard ships a unit whose only
+# [Install] line is Alias=dbus-org.neard.service, i.e. it is meant to be
+# bus-activated, but no activation file, so nothing can ever start it and
+# "systemctl enable neard" is a no-op. With this file, the first client that
+# talks to org.neard starts the daemon on demand.
+[D-BUS Service]
+Name=org.neard
+Exec=/bin/false
+User=root
+SystemdService=dbus-org.neard.service
