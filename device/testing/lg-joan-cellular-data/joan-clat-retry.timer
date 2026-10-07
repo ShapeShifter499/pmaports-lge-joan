@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodically retry the CLAT if cellular data has no IPv4
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+AccuracySec=10min
+
+[Install]
+WantedBy=timers.target

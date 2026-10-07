@@ -1,0 +1,12 @@
+#!/bin/sh
+# Periodic CLAT retry (joan-clat-retry.timer). clatd gives up for good when
+# its one DNS64 lookup fails, and normally only the NetworkManager
+# dispatcher (a connection going up or down) starts it again. If the
+# carrier's DNS64 hiccups while the connection stays up, nothing would.
+# Start clatd only when cellular data is up, the phone has no IPv4 route at
+# all and clatd is not running; otherwise exit without touching the network.
+systemctl -q is-active clatd.service && exit 0
+ip -4 route show default | grep -q . && exit 0
+nmcli -t -f TYPE,STATE connection show --active 2>/dev/null |
+	grep -q '^gsm:activated$' || exit 0
+exec systemctl start --no-block clatd.service

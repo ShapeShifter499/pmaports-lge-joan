@@ -1,0 +1,6 @@
+[Unit]
+Description=Retry the CLAT if cellular data has no IPv4
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/lg-joan-cellular-data/joan-clat-retry

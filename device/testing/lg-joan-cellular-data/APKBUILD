@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=lg-joan-cellular-data
 pkgver=0.2
-pkgrel=6
+pkgrel=7
 pkgdesc="LG V30 (joan) cellular data defaults — rmnet DAD workaround, NetworkManager profile, IPv4 on IPv6-only SIMs (464XLAT)"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -27,7 +27,11 @@ source="
 	joan-clat-down
 	joan-clat-reset
 	joan-clat-up
+	joan-clat-retry
 	joan-clat-run
+	joan-clat-retry.service
+	joan-clat-retry.timer
+	85-lg-joan-cellular-data.preset
 	"
 
 package() {
@@ -42,14 +46,19 @@ package() {
 		"$srcdir/joan-clat-down" \
 		"$srcdir/joan-clat-reset" \
 		"$srcdir/joan-clat-up" \
+		"$srcdir/joan-clat-retry" \
 		"$srcdir/joan-clat-run"
 }
 
 systemd_unit() {
-	pkgdesc="systemd service for clatd (started by the NetworkManager dispatcher)"
+	pkgdesc="systemd units for clatd (started by the NetworkManager dispatcher) and its retry timer"
 	install_if="$pkgname=$pkgver-r$pkgrel systemd"
-	install -Dm644 "$srcdir/clatd.service" \
-		"$subpkgdir/usr/lib/systemd/system/clatd.service"
+	install -Dm644 -t "$subpkgdir/usr/lib/systemd/system" \
+		"$srcdir/clatd.service" \
+		"$srcdir/joan-clat-retry.service" \
+		"$srcdir/joan-clat-retry.timer"
+	install -Dm644 "$srcdir/85-lg-joan-cellular-data.preset" \
+		"$subpkgdir/usr/lib/systemd/system-preset/85-lg-joan-cellular-data.preset"
 }
 sha512sums="
 4b29d2b6843b7b0430670468ac0c377e8392d1baf742e4462275b287e85db51b2274fdd594b6c570847091a8718a52cdb3a8dbccb8431b112081705e8910cccc  40-joan-rmnet-nodad
@@ -60,5 +69,9 @@ a075adde96a59683e9bfb8a2753c1fd8f90224d4075a2ac0077f90c5a96900e42aea12d31a7e3a8b
 ee67bf031f1d073a3c187ccf04823c4478af4119a0d84cdce81242c8ab359bc971027d664a244fe83e15ca48a955d63d7b47513b718e97827c2c2e59e7908f75  joan-clat-down
 df427b8a3137d3bfa6dea04109011bffee46032667d3a8c15a6efe350e6a5211849177bb7fdf12692db0f635f012684d7837c1e55e7f4a70798ccd1847c8c46f  joan-clat-reset
 bd66d0ca0bbafb647665480fbe14567d17258c642f15959612a4a89d96cc46427439ee66887a986d117bfea6c99e7eed7e37b4733a900321168f367f4e5413b7  joan-clat-up
+fc391f69bb537e31471090f3cce8785ce7792bffaa81621cc01fa7132ec5dc833e1ac406e2d2531f4d64ceeb1426198962f4ad11e74b3bddb081d791c5999014  joan-clat-retry
 b533a0aba776fd90597a397dd8517c4f39bc340498d956fbb5a49ae7aee01fafc2a1b10250cf688d761a60ba60225ba703dd056e2b6090aabbddedba9c81cdda  joan-clat-run
+b45836d34ff1c0778e4c98c76168801f78d4e2192b6b8840efb5965aa48d1e19a8579e6ea50771341e8bead93b2265d67bd7a7ce69feec77422c2fc827e30bd8  joan-clat-retry.service
+600606dcf4651289580afcdf97461bea76a4c750d4a4379b390d3801adeae88e89ce131edf919d995b5a4e943d67a9c52325292831035dee47c2dd13698243e9  joan-clat-retry.timer
+e341ff8036cb3bf810bcc911e3e4f6dbac2acd6f403d7677a62c0aa676f2db3232b3a3540c2e173cdc02426c7f9eddade067823de6921fc2adee03c9d9da4beb  85-lg-joan-cellular-data.preset
 "
