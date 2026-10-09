@@ -24,6 +24,11 @@ deviceinfo_flash_offset_ramdisk="0x02000000"
 deviceinfo_flash_offset_second="0x00f00000"
 deviceinfo_flash_offset_tags="0x00000100"
 deviceinfo_flash_pagesize="4096"
+# LG aboot accepts a fastboot download of at most 0x1e9f000 (32,108,544)
+# bytes. With the default gzip initramfs a 7.3 kernel made boot.img
+# 32,198,656 bytes and fastboot boot could not take it; zstd at its best
+# level brings it to 31,223,808 (measured on the device, 2026-10-09).
+deviceinfo_initfs_compression="zstd:best"
 
 # Mainline kernel options
 deviceinfo_kernel_cmdline="panic=5 pmos.force-partition-resize ipa.lowmem=1"

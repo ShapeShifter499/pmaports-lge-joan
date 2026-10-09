@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lg-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=24
+pkgrel=26
 url="https://postmarketos.org"
 license="MIT"
 provides="device-lge-joan=$pkgver-r$pkgrel"
@@ -106,7 +106,7 @@ package() {
 }
 
 sha512sums="
-f8b8f334433eb736d000380154e7d0c6c1a878ba64f7ec53dcccb03d2b546d9c4afc803d26202a40e380ee952aad4b0947a38b682e618418731818c44d354ca4  deviceinfo
+79a22a09ae518e3c38fe51b7abb608663ed312f9739a3615738243103ad95cba73585c44bcb5795eeb71e2d8ef1d206e4c0f6d6afa828203833682576500af4e  deviceinfo
 e541a5c9127ef86c9ebde27744c2f483004ba54731ad31f2326550b81105a727a46855c2f4faeb94a6bea3c7cb2bd551264fa8c787417311dab1ef9e620c4d1a  50-joan-echo-cancel.conf
 7074b0d87f54fa9c90383bca028f761a543f9c13d976b4c9096482ca98184fc5e82e922db8e339dc95d34d46c02f43dd726d9f8348ccbd801b13dfcf60b95bbe  53-joan-driver-priority.conf
 6502a1ee494f223c3184f832ce0aa6d7d88ce5cf5294def54361dc4798fd7664f90785df380d3c975a5215178f23d6aabbae3a1bbf115bcd3441190b47cd2dcc  54-joan-no-mmap.conf
