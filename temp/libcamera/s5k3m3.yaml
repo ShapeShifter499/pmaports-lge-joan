@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: CC0-1.0
+#
+# S5K3M3 on the LG V30 (joan), libcamera software ISP (simple pipeline).
+# Colour data is LG/Qualcomm tuning extracted from the stock US998 30b
+# firmware (chromatix 0x0310): libchromatix_s5k3m3_common.so, libchromatix_s5k3m3_preview.so, libchromatix_s5k3m3_zsl_preview_3a.so.
+# How it was extracted and converted: NOTES.md in joan-camera-tuning-20261009.
+%YAML 1.1
+---
+version: 1
+algorithms:
+  - BlackLevel:
+      # Stock linearization pedestal 253 @ 12 bit = 63.25 @ 10 bit; 16-bit scale here.
+      blackLevel: 4048
+  - Awb:
+      # Ignored by libcamera 0.7.2 (no Awb tuning there). Upstream master (libipa
+      # AwbGrey) uses it only for manual ColourTemperature. Stock AWB reference
+      # points as [R gain, B gain] = [G/R, G/B], keyed like the CCMs below.
+      colourGains:
+        - ct: 2659   # H
+          gains: [ 0.9039, 2.9468 ]
+        - ct: 3468   # A
+          gains: [ 1.3979, 2.7641 ]
+        - ct: 4248   # TL84
+          gains: [ 1.8276, 2.1496 ]
+        - ct: 5142   # D50
+          gains: [ 2.1838, 1.7363 ]
+        - ct: 6223   # D65
+          gains: [ 2.6495, 1.4930 ]
+        - ct: 8293   # D75
+          gains: [ 3.2528, 1.2503 ]
+  - Ccm:
+      # Stock ISP colour-correction matrices (row-major, RGB, applied after WB).
+      # ct = libcamera estimateCCT() of the stock AWB reference point, NOT the
+      # nominal illuminant CCT, so the matrix switches where libcamera thinks
+      # that illuminant is.
+      ccms:
+        - ct: 2659   # H (nominal ~2300 K)
+          ccm: [   1.57390,  -0.50390,  -0.07000,
+                 -0.36030,   1.45460,  -0.09430,
+                 -0.22170,  -1.14020,   2.36190 ]
+        - ct: 3468   # A (nominal ~2850 K)
+          ccm: [   1.57390,  -0.50390,  -0.07000,
+                 -0.36030,   1.45460,  -0.09430,
+                 -0.22170,  -1.14020,   2.36190 ]
+        - ct: 4248   # TL84 (nominal ~4000 K)
+          ccm: [   1.82600,  -0.82050,  -0.00550,
+                 -0.29700,   1.42560,  -0.12860,
+                  0.00990,  -0.80320,   1.79330 ]
+        - ct: 5142   # D50 (nominal ~5000 K)
+          ccm: [   1.72580,  -0.71650,  -0.00930,
+                 -0.19860,   1.41660,  -0.21800,
+                 -0.00840,  -0.82780,   1.83620 ]
+        - ct: 6223   # D65 (nominal ~6500 K)
+          ccm: [   1.72580,  -0.71650,  -0.00930,
+                 -0.19860,   1.41660,  -0.21800,
+                 -0.00840,  -0.82780,   1.83620 ]
+  - Adjust:
+  - Agc:
+...

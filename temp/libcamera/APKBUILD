@@ -3,7 +3,7 @@ maintainer="Robert Mader <robert.mader@collabora.com>"
 pkgname=libcamera
 _pkgver=0.7.2
 pkgver=9999$_pkgver
-pkgrel=5
+pkgrel=6
 pkgdesc="Linux camera framework"
 url="https://libcamera.org/"
 arch="all"
@@ -46,6 +46,7 @@ subpackages="
 	py3-$pkgname:py3
 	"
 _tuning_files="
+	hi553.yaml
 	hi846.yaml
 	imx351.yaml
 	imx355.yaml
@@ -56,6 +57,7 @@ _tuning_files="
 	imx800.yaml
 	imx858.yaml
 	s5k3l6xx.yaml
+	s5k3m3.yaml
 	s5kjn1.yaml
 	"
 source="https://gitlab.freedesktop.org/camera/libcamera/-/archive/v$_pkgver/libcamera-v$_pkgver.tar.gz
@@ -193,7 +195,7 @@ ac4e3c742fde4f8e4775bd2afbaaecb18fa49b869eb4309032bae985680f97443353eb384de19a9b
 9215de0c0b8da2407f40af83ab754ac84d2b6afd2966167ed29f367cfcbbed7a1d84a4f4bf575357b15b613da13cf7975073dc47effd22aecaa8b2b5cac98ba0  0009-libcamera-Add-sensor-helper-and-properties-for-the-S.patch
 22167a4eceb6d1b40b0b7c45fdf116c71684f5340de7f767535cb8e160ad9d2ae0f00cb3d461f73a344520a48a4641cf46226841d78bee06bfbfd2a91337f754  qcam.desktop
 2ee566653b17d565d2c0de67cbe6ebad25df5aac6051cad78e6bae52016fa2ca0247e964d735ac776b3e0bd447ead9c4fcb26cd7629228cdba3ceb91b46f378f  hi846.yaml
-fa0f06592004d0bfaf491060fb3cc352886b13cd69477e665af00fe12f02d4ff108d4e31b395f88c4800d0b5d704098d224a492bcc6cc62fcfa2a1d7510a47ca  imx351.yaml
+996ddbe43f99406a4023e2fb7fbab1d51056123071d864942289c97f99d16c3a87000823c64b4c0fed422674c5beb0f736ee279f8ee9dfca54b054b7a96a0fb1  imx351.yaml
 4942edd551dcf51630246f71e600c17760d3574d5d45e5530d6cfeefe2c9ab1a812fbe220f8e89d92e19a499c592b2507c801ca4eb74cd15fcecb60bff5c650b  imx355.yaml
 285c6d0d712df341c0117c3762ddc139f53f44e6be36c3388d1a62696429175e2916f392163131e21f410c3676f02f5d125f375171f45f8d82ad278aa5076c62  imx363.yaml
 1b1f6d36311bee38006eaa1e380571fc9fbd5625fd72f63309426d3651483cef52a176d56cdebd2ce46cbb264684ede186740df169027d2bf27d0f3057da2f86  imx371.yaml
@@ -203,4 +205,6 @@ fa0f06592004d0bfaf491060fb3cc352886b13cd69477e665af00fe12f02d4ff108d4e31b395f88c
 55dab9dcb9b1982143b9d63e4e51138c5bffd7c8f4a8e4e122750b3ad9d475446956bc297d9f564819ade4be75a575d06633a064e14f8ba3ef77986783c5f067  imx858.yaml
 2ee566653b17d565d2c0de67cbe6ebad25df5aac6051cad78e6bae52016fa2ca0247e964d735ac776b3e0bd447ead9c4fcb26cd7629228cdba3ceb91b46f378f  s5k3l6xx.yaml
 d59020e62520ee622282c85ce7bcdfe453c99becf48cc1005c5f8a4bb8b2511b19c89f38fb3c994e7c6a79d1f84e2ed5f5a09b4c5bdc1dc4a44b071dbccf0d44  s5kjn1.yaml
+5fea85a55ad970eb17d4e8fbd6f7dafc80b0960be74e056997a8bfe89995436ceb3efccfb5b01a6d24a4b12eed26aefb507b050c61582ca41328fe9b6b172ca0  hi553.yaml
+0d826dabad974f28af40db8216aac43f8ae188293803cc666bd92e90ba80d53fda58c1f2def6deadc5d05db6530ca80b7eab91c3dd969dba709a085efc7afb51  s5k3m3.yaml
 "
