@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=FM Radio
+Comment=Tune the FM receiver
+Exec=fm-radio
+Icon=io.github.ShapeShifter499.FmRadio
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=fm;radio;tuner;rds;
+X-Purism-FormFactor=Workstation;Mobile;

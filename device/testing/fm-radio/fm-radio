@@ -1,0 +1,483 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""FM Radio: tune a V4L2 radio receiver (/dev/radio0).
+
+A small GTK4/libadwaita front end for the kernel's V4L2 radio API, written
+for the LG V30's WCN3990 receiver (radio-qca-fm) but not specific to it.
+It tunes, seeks with the hardware seek, shows signal strength and stereo,
+decodes the RDS programme service name and radiotext, and keeps presets.
+
+Sound is a separate path: the tuner only demodulates. Where the kernel
+offers no FM capture device yet, the app says so instead of pretending.
+"""
+import ctypes
+import errno
+import fcntl
+import json
+import os
+import struct
+import sys
+import threading
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, GLib, Gtk  # noqa: E402
+
+APP_ID = "io.github.ShapeShifter499.FmRadio"
+DEVICE = os.environ.get("FM_RADIO_DEVICE", "/dev/radio0")
+STEP_KHZ = 100
+
+# --- V4L2 ------------------------------------------------------------------
+
+_IOC_WRITE, _IOC_READ = 1, 2
+
+
+def _ioc(direction, nr, size):
+    return (direction << 30) | (size << 16) | (ord("V") << 8) | nr
+
+
+class V4l2Tuner(ctypes.Structure):
+    _fields_ = [("index", ctypes.c_uint32), ("name", ctypes.c_char * 32),
+                ("type", ctypes.c_uint32), ("capability", ctypes.c_uint32),
+                ("rangelow", ctypes.c_uint32), ("rangehigh", ctypes.c_uint32),
+                ("rxsubchans", ctypes.c_uint32), ("audmode", ctypes.c_uint32),
+                ("signal", ctypes.c_int32), ("afc", ctypes.c_int32),
+                ("reserved", ctypes.c_uint32 * 4)]
+
+
+class V4l2Frequency(ctypes.Structure):
+    _fields_ = [("tuner", ctypes.c_uint32), ("type", ctypes.c_uint32),
+                ("frequency", ctypes.c_uint32),
+                ("reserved", ctypes.c_uint32 * 8)]
+
+
+class V4l2HwFreqSeek(ctypes.Structure):
+    _fields_ = [("tuner", ctypes.c_uint32), ("type", ctypes.c_uint32),
+                ("seek_upward", ctypes.c_uint32),
+                ("wrap_around", ctypes.c_uint32),
+                ("spacing", ctypes.c_uint32), ("rangelow", ctypes.c_uint32),
+                ("rangehigh", ctypes.c_uint32),
+                ("reserved", ctypes.c_uint32 * 5)]
+
+
+class V4l2Control(ctypes.Structure):
+    _fields_ = [("id", ctypes.c_uint32), ("value", ctypes.c_int32)]
+
+
+VIDIOC_S_CTRL = _ioc(_IOC_READ | _IOC_WRITE, 28, ctypes.sizeof(V4l2Control))
+VIDIOC_G_TUNER = _ioc(_IOC_READ | _IOC_WRITE, 29, ctypes.sizeof(V4l2Tuner))
+VIDIOC_G_FREQUENCY = _ioc(_IOC_READ | _IOC_WRITE, 56,
+                          ctypes.sizeof(V4l2Frequency))
+VIDIOC_S_FREQUENCY = _ioc(_IOC_WRITE, 57, ctypes.sizeof(V4l2Frequency))
+VIDIOC_S_HW_FREQ_SEEK = _ioc(_IOC_WRITE, 82, ctypes.sizeof(V4l2HwFreqSeek))
+
+V4L2_TUNER_RADIO = 1
+V4L2_TUNER_CAP_LOW = 0x0001
+V4L2_TUNER_SUB_STEREO = 0x0002
+V4L2_CID_AUDIO_MUTE = 0x00980909
+V4L2_CID_RDS_RECEPTION = 0x00a10902
+
+
+class Radio:
+    """Thin wrapper over one V4L2 radio tuner (index 0)."""
+
+    def __init__(self, path):
+        self.fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+        t = self.tuner()
+        self.unit_hz = 62.5 if t.capability & V4L2_TUNER_CAP_LOW else 62500
+        self.low_khz = self._to_khz(t.rangelow)
+        self.high_khz = self._to_khz(t.rangehigh)
+
+    def _to_khz(self, v):
+        return round(v * self.unit_hz / 1000)
+
+    def _from_khz(self, khz):
+        return round(khz * 1000 / self.unit_hz)
+
+    def tuner(self):
+        t = V4l2Tuner(index=0)
+        fcntl.ioctl(self.fd, VIDIOC_G_TUNER, t)
+        return t
+
+    def frequency_khz(self):
+        f = V4l2Frequency(tuner=0, type=V4L2_TUNER_RADIO)
+        fcntl.ioctl(self.fd, VIDIOC_G_FREQUENCY, f)
+        return self._to_khz(f.frequency)
+
+    def tune_khz(self, khz):
+        khz = min(max(khz, self.low_khz), self.high_khz)
+        f = V4l2Frequency(tuner=0, type=V4L2_TUNER_RADIO,
+                          frequency=self._from_khz(khz))
+        fcntl.ioctl(self.fd, VIDIOC_S_FREQUENCY, f)
+
+    def seek(self, upward):
+        s = V4l2HwFreqSeek(tuner=0, type=V4L2_TUNER_RADIO,
+                           seek_upward=int(upward), wrap_around=1)
+        # The seek blocks until a station is found or the band is swept,
+        # which a non-blocking descriptor would turn into EAGAIN.
+        flags = fcntl.fcntl(self.fd, fcntl.F_GETFL)
+        fcntl.fcntl(self.fd, fcntl.F_SETFL, flags & ~os.O_NONBLOCK)
+        try:
+            fcntl.ioctl(self.fd, VIDIOC_S_HW_FREQ_SEEK, s)
+        finally:
+            fcntl.fcntl(self.fd, fcntl.F_SETFL, flags)
+
+    def set_ctrl(self, cid, value):
+        c = V4l2Control(id=cid, value=int(value))
+        fcntl.ioctl(self.fd, VIDIOC_S_CTRL, c)
+
+    def read_rds(self):
+        """Return a list of (block_id, word) for whatever RDS is queued."""
+        try:
+            data = os.read(self.fd, 3 * 64)
+        except BlockingIOError:
+            return []
+        out = []
+        for i in range(0, len(data) - len(data) % 3, 3):
+            lsb, msb, blk = struct.unpack_from("BBB", data, i)
+            if blk & 0x80:          # uncorrectable error
+                continue
+            out.append((blk & 0x07, (msb << 8) | lsb))
+        return out
+
+    def close(self):
+        os.close(self.fd)
+
+
+class RdsDecoder:
+    """Programme service name (group 0) and radiotext (group 2), RDS spec."""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.pi = None
+        self.ps = [" "] * 8
+        self.rt = [" "] * 64
+        self.rt_ab = None
+        self.group = {}
+
+    def feed(self, block_id, word):
+        if block_id == 0:
+            self.group = {0: word}
+            return False
+        if 0 not in self.group:
+            return False
+        self.group[4 if block_id == 4 else block_id] = word
+        if block_id != 3:
+            return False
+        g = self.group
+        self.group = {}
+        if 1 not in g:
+            return False
+        self.pi = g[0]
+        b = g[1]
+        gtype, version_b = b >> 12, bool(b & 0x0800)
+        if gtype == 0:
+            seg = b & 0x03
+            self.ps[seg * 2] = _rds_char(g[3] >> 8)
+            self.ps[seg * 2 + 1] = _rds_char(g[3] & 0xff)
+            return True
+        if gtype == 2:
+            ab = bool(b & 0x10)
+            if self.rt_ab is not None and ab != self.rt_ab:
+                self.rt = [" "] * 64
+            self.rt_ab = ab
+            seg = b & 0x0f
+            if version_b:
+                words = [g[3]]
+                base = seg * 2
+            else:
+                if 2 not in g:
+                    return False
+                words = [g[2], g[3]]
+                base = seg * 4
+            for n, w in enumerate(words):
+                self.rt[base + 2 * n] = _rds_char(w >> 8)
+                self.rt[base + 2 * n + 1] = _rds_char(w & 0xff)
+            return True
+        return False
+
+    @property
+    def name(self):
+        return "".join(self.ps).strip()
+
+    @property
+    def text(self):
+        return "".join(self.rt).split("\r")[0].strip()
+
+
+def _rds_char(c):
+    return chr(c) if 0x20 <= c < 0x7f else " "
+
+
+# --- presets ---------------------------------------------------------------
+
+def _presets_path():
+    return os.path.join(GLib.get_user_config_dir(), "fm-radio", "presets.json")
+
+
+def load_presets():
+    try:
+        with open(_presets_path()) as f:
+            return [int(k) for k in json.load(f)]
+    except (OSError, ValueError, TypeError):
+        return []
+
+
+def save_presets(presets):
+    path = _presets_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(sorted(set(presets)), f)
+
+
+def fm_capture_present():
+    """True if ALSA lists a capture PCM that names FM."""
+    try:
+        with open("/proc/asound/pcm") as f:
+            return any("FM" in line and "capture" in line for line in f)
+    except OSError:
+        return False
+
+
+# --- UI --------------------------------------------------------------------
+
+class RadioWindow(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="FM Radio")
+        self.set_default_size(360, 640)
+        self.radio = None
+        self.rds = RdsDecoder()
+        self.busy = False
+        self.presets = load_presets()
+
+        toolbar = Adw.ToolbarView()
+        toolbar.add_top_bar(Adw.HeaderBar())
+        self.toasts = Adw.ToastOverlay()
+        toolbar.set_content(self.toasts)
+        self.set_content(toolbar)
+
+        page = Adw.PreferencesPage()
+        self.toasts.set_child(page)
+
+        self.banner = Adw.Banner(revealed=False)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.append(self.banner)
+
+        tuner = Adw.PreferencesGroup()
+        page.add(tuner)
+        self.freq_label = Gtk.Label(label="—", margin_top=12)
+        self.freq_label.add_css_class("title-1")
+        self.name_label = Gtk.Label(label="", margin_bottom=4)
+        self.name_label.add_css_class("title-3")
+        self.text_label = Gtk.Label(label="", wrap=True, justify=Gtk.Justification.CENTER)
+        self.text_label.add_css_class("dim-label")
+        box.append(self.freq_label)
+        box.append(self.name_label)
+        box.append(self.text_label)
+
+        buttons = Gtk.Box(spacing=6, halign=Gtk.Align.CENTER, margin_top=12,
+                          margin_bottom=12)
+        for icon, tip, cb in (
+                ("media-skip-backward-symbolic", "Seek down", lambda *_: self.seek(False)),
+                ("go-previous-symbolic", "Down 0.1 MHz", lambda *_: self.step(-STEP_KHZ)),
+                ("go-next-symbolic", "Up 0.1 MHz", lambda *_: self.step(STEP_KHZ)),
+                ("media-skip-forward-symbolic", "Seek up", lambda *_: self.seek(True))):
+            b = Gtk.Button(icon_name=icon, tooltip_text=tip)
+            b.add_css_class("circular")
+            b.connect("clicked", cb)
+            buttons.append(b)
+        box.append(buttons)
+        tuner.add(box)
+
+        status = Adw.PreferencesGroup(title="Reception")
+        page.add(status)
+        self.signal_row = Adw.ActionRow(title="Signal")
+        self.signal_bar = Gtk.LevelBar(min_value=0, max_value=100,
+                                       valign=Gtk.Align.CENTER, hexpand=True)
+        self.signal_row.add_suffix(self.signal_bar)
+        status.add(self.signal_row)
+        self.stereo_row = Adw.ActionRow(title="Stereo", subtitle="—")
+        status.add(self.stereo_row)
+        self.audio_row = Adw.ActionRow(title="Sound")
+        status.add(self.audio_row)
+
+        self.preset_group = Adw.PreferencesGroup(title="Presets")
+        add = Gtk.Button(icon_name="list-add-symbolic",
+                         tooltip_text="Save this frequency")
+        add.add_css_class("flat")
+        add.connect("clicked", self.on_add_preset)
+        self.preset_group.set_header_suffix(add)
+        page.add(self.preset_group)
+        self.preset_rows = []
+        self.refresh_presets()
+
+        self.open_radio()
+        GLib.timeout_add(500, self.poll)
+        self.connect("close-request", self.on_close)
+
+    # device -----------------------------------------------------------
+
+    def open_radio(self):
+        try:
+            self.radio = Radio(DEVICE)
+        except OSError as e:
+            self.radio = None
+            if e.errno == errno.ENOENT:
+                msg = ("No FM receiver found. On the LG V30 the receiver "
+                       "shares the Bluetooth chip: turn Bluetooth on.")
+            elif e.errno in (errno.EACCES, errno.EPERM):
+                msg = f"No permission to open {DEVICE}."
+            else:
+                msg = f"Cannot open {DEVICE}: {e.strerror}"
+            self.banner.set_title(msg)
+            self.banner.set_revealed(True)
+            self.freq_label.set_label("—")
+            return False
+        self.banner.set_revealed(False)
+        for cid, val in ((V4L2_CID_RDS_RECEPTION, 1), (V4L2_CID_AUDIO_MUTE, 0)):
+            try:
+                self.radio.set_ctrl(cid, val)
+            except OSError:
+                pass
+        if fm_capture_present():
+            self.audio_row.set_subtitle("FM capture device present")
+        else:
+            self.audio_row.set_subtitle(
+                "Not available yet: this kernel has no FM capture path, so "
+                "the station plays nowhere. Tuning and RDS work.")
+        self.update_frequency()
+        return True
+
+    def run_blocking(self, fn, done):
+        """Run a blocking tuner call off the UI thread."""
+        if self.busy or not self.radio:
+            return
+        self.busy = True
+
+        def worker():
+            err = None
+            try:
+                fn()
+            except OSError as e:
+                err = e
+            GLib.idle_add(finish, err)
+
+        def finish(err):
+            self.busy = False
+            if err:
+                self.toast(f"Tuner error: {err.strerror}")
+            done()
+            return False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    # actions ------------------------------------------------------------
+
+    def step(self, delta_khz):
+        if not self.radio:
+            return
+        khz = self.radio.frequency_khz() + delta_khz
+        if khz > self.radio.high_khz:
+            khz = self.radio.low_khz
+        elif khz < self.radio.low_khz:
+            khz = self.radio.high_khz
+        self.tune(khz)
+
+    def tune(self, khz):
+        self.run_blocking(lambda: self.radio.tune_khz(khz), self.update_frequency)
+
+    def seek(self, upward):
+        self.freq_label.set_label("Seeking…")
+        self.run_blocking(lambda: self.radio.seek(upward), self.update_frequency)
+
+    def on_add_preset(self, *_):
+        if not self.radio:
+            return
+        self.presets.append(self.radio.frequency_khz())
+        save_presets(self.presets)
+        self.presets = load_presets()
+        self.refresh_presets()
+
+    def refresh_presets(self):
+        for row in self.preset_rows:
+            self.preset_group.remove(row)
+        self.preset_rows = []
+        for khz in self.presets:
+            row = Adw.ActionRow(title=f"{khz / 1000:.1f} MHz", activatable=True)
+            row.connect("activated", lambda _r, k=khz: self.tune(k))
+            rm = Gtk.Button(icon_name="user-trash-symbolic",
+                            valign=Gtk.Align.CENTER)
+            rm.add_css_class("flat")
+            rm.connect("clicked", lambda _b, k=khz: self.remove_preset(k))
+            row.add_suffix(rm)
+            self.preset_group.add(row)
+            self.preset_rows.append(row)
+
+    def remove_preset(self, khz):
+        self.presets = [p for p in self.presets if p != khz]
+        save_presets(self.presets)
+        self.refresh_presets()
+
+    # status ---------------------------------------------------------------
+
+    def update_frequency(self):
+        if not self.radio:
+            return
+        try:
+            khz = self.radio.frequency_khz()
+        except OSError:
+            return
+        self.freq_label.set_label(f"{khz / 1000:.1f} MHz")
+        self.rds.reset()
+        self.name_label.set_label("")
+        self.text_label.set_label("")
+
+    def poll(self):
+        if not self.radio:
+            return GLib.SOURCE_CONTINUE
+        if self.busy:
+            return GLib.SOURCE_CONTINUE
+        try:
+            t = self.radio.tuner()
+        except OSError:
+            return GLib.SOURCE_CONTINUE
+        # V4L2 signal is 0..65535
+        self.signal_bar.set_value(max(0, t.signal) * 100 / 65535)
+        self.stereo_row.set_subtitle(
+            "Yes" if t.rxsubchans & V4L2_TUNER_SUB_STEREO else "Mono")
+        changed = False
+        for blk, word in self.radio.read_rds():
+            changed |= self.rds.feed(blk, word)
+        if changed:
+            self.name_label.set_label(self.rds.name)
+            self.text_label.set_label(self.rds.text)
+        return GLib.SOURCE_CONTINUE
+
+    def toast(self, text):
+        self.toasts.add_toast(Adw.Toast(title=text))
+
+    def on_close(self, *_):
+        if self.radio:
+            try:
+                self.radio.set_ctrl(V4L2_CID_AUDIO_MUTE, 1)
+            except OSError:
+                pass
+            self.radio.close()
+        return False
+
+
+class RadioApp(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID)
+
+    def do_activate(self):
+        win = self.props.active_window or RadioWindow(self)
+        win.present()
+
+
+if __name__ == "__main__":
+    sys.exit(RadioApp().run(sys.argv))
