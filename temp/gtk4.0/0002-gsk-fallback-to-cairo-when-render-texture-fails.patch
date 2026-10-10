@@ -1,0 +1,105 @@
+--- a/gsk/gpu/gskgpurenderer.c
++++ b/gsk/gpu/gskgpurenderer.c
+@@ -13,6 +13,7 @@
+ #include "gdk/gdkdebugprivate.h"
+ #include "gdk/gdkdisplayprivate.h"
+ #include "gdk/gdkdmabuftextureprivate.h"
++#include "gdk/gdkglcontext.h"
+ #include "gdk/gdkmemorytextureprivate.h"
+ #include "gdk/gdkdrawcontextprivate.h"
+ #include "gdk/gdkprofilerprivate.h"
+@@ -134,6 +135,20 @@
+   gsk_renderer_unrealize (GSK_RENDERER (downloader));
+ }
+ 
++/* Returns FALSE when the GL renderer could not make its context current.
++ * The GDK make_current wrapper only warns on failure and leaves the thread
++ * without a current context; every later GL use would then dereference
++ * NULL and crash (seen on GLES-only devices with no Vulkan fallback).
++ */
++static gboolean
++gsk_gpu_renderer_ensure_current (GskGpuRenderer *self)
++{
++  gsk_gpu_renderer_make_current (self);
++
++  return !GDK_IS_GL_CONTEXT (gsk_gpu_renderer_get_context (self)) ||
++         gdk_gl_context_get_current () != NULL;
++}
++
+ static gboolean
+ gsk_gpu_renderer_dmabuf_downloader_download (GdkDmabufDownloader   *downloader,
+                                              GdkDmabufTexture      *texture,
+@@ -153,7 +168,11 @@
+   timestamp = g_get_monotonic_time ();
+   gsk_gpu_device_maybe_gc (priv->device, timestamp);
+ 
+-  gsk_gpu_renderer_make_current (self);
++  if (!gsk_gpu_renderer_ensure_current (self))
++    {
++      gsk_gpu_renderer_restore_current (self, previous);
++      return FALSE;
++    }
+ 
+   frame = gsk_gpu_renderer_get_frame (self);
+ 
+@@ -362,7 +381,11 @@
+ 
+           /* Let's GC like a madman, we draw oversized stuff and don't want to OOM */
+           gsk_gpu_device_maybe_gc (priv->device, timestamp);
+-          gsk_gpu_renderer_make_current (self);
++          if (!gsk_gpu_renderer_ensure_current (self))
++            {
++              g_free (data);
++              return NULL;
++            }
+         }
+     }
+ 
+@@ -391,7 +414,8 @@
+ 
+   gsk_gpu_device_maybe_gc (priv->device, timestamp);
+ 
+-  gsk_gpu_renderer_make_current (self);
++  if (!gsk_gpu_renderer_ensure_current (self))
++    return NULL;
+ 
+   rounded_viewport = GRAPHENE_RECT_INIT (viewport->origin.x,
+                                          viewport->origin.y,
+@@ -462,7 +486,8 @@
+   timestamp = g_get_monotonic_time ();
+   gsk_gpu_device_maybe_gc (priv->device, timestamp);
+ 
+-  gsk_gpu_renderer_make_current (self);
++  if (!gsk_gpu_renderer_ensure_current (self))
++    return;
+ 
+   frame = gsk_gpu_renderer_get_frame (self);
+   scale = gdk_surface_get_scale (gdk_draw_context_get_surface (priv->context));
+--- a/gsk/gskrenderer.c
++++ b/gsk/gskrenderer.c
+@@ -410,6 +410,25 @@
+ 
+   texture = GSK_RENDERER_GET_CLASS (renderer)->render_texture (renderer, root, viewport);
+ 
++  if (texture == NULL && !GSK_IS_CAIRO_RENDERER (renderer))
++    {
++      /* The GPU renderers can fail to produce a texture, for example when
++       * their GL context cannot be made current.  Fall back to a temporary
++       * cairo renderer so callers still get a texture instead of nothing.
++       */
++      GskRenderer *fallback = gsk_cairo_renderer_new ();
++      GdkDisplay *display = priv->surface
++                              ? gdk_surface_get_display (priv->surface)
++                              : NULL;
++
++      if (gsk_renderer_realize_for_display (fallback, display, NULL))
++        {
++          texture = gsk_renderer_render_texture (fallback, root, viewport);
++          gsk_renderer_unrealize (fallback);
++        }
++      g_object_unref (fallback);
++    }
++
+   return texture;
+ }
+ 

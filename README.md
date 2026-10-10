@@ -324,7 +324,7 @@ the joan UCM profile, and the VoLTE metapackage (`lg-joan-volte` →
 | video | hardware decode (Venus) for GStreamer, FFmpeg and Firefox |
 | Wi-Fi / Bluetooth | WCN3990; stable MAC addresses from bootmac |
 | cellular | data auto-connects and comes back after reconnects, modem restarts and Wi-Fi hand-offs; IPv6-only SIMs also get IPv4 through 464XLAT (`clatd`, only when the network offers NAT64 and no native IPv4); VoLTE via joan-imsd is set up by hand (`FIRST-INSTALL-VOLTE.md`) |
-| camera | all three (IMX351 main, S5K3M3 wide, HI553 front) capture through libcamera and show in Snapshot; photo capture needs GSK_RENDERER=cairo until a GTK GL crash is fixed; front image washed out pending ISP tuning |
+| camera | all three (IMX351 main, S5K3M3 wide, HI553 front) capture through libcamera and show in Snapshot; photo capture works with the carried temp/gtk4.0 (GL-context guard + cairo fallback); switching cameras freezes the viewfinder until app restart (in-process GStreamer GL tears down the shared EGL display; root-caused, upstream reports pending); front image washed out pending ISP tuning |
 | NFC | PN547 with neard; `nfc-tags` app |
 | FM radio | tuner works (`/dev/radio0`); no audio path yet |
 | USB-C display | DP alt-mode support merged in the kernel (r5); not yet validated on device |

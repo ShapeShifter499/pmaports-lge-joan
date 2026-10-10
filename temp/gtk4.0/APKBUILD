@@ -1,0 +1,143 @@
+# Forked from Alpine (community/gtk4.0 4.24.1-r0) for the joan GLES crash fix.
+# 0002: render_texture NULL-context guard + cairo fallback (Snapshot SEGV).
+# Contributor: Rasmus Thomsen <oss@cogitri.dev>
+maintainer="team/gnome <achill@achill.org>"
+pkgname=gtk4.0
+_pkgver=4.24.1
+pkgver=9999$_pkgver
+pkgrel=1
+# NOTE: Upgrade only to even-numbered versions (e.g. 1.18.x, 1.20.x)!
+pkgdesc="The GTK Toolkit (v4)"
+url="https://www.gtk.org/"
+arch="all"
+options="!check" # Test suite is known to fail upstream
+license="LGPL-2.1-or-later"
+depends="
+	gtk-update-icon-cache
+	iso-codes
+	shared-mime-info
+	tzdata
+	"
+depends_dev="
+	at-spi2-core-dev
+	gdk-pixbuf-dev
+	glib-dev
+	libepoxy-dev
+	libxext-dev
+	libxi-dev
+	libxinerama-dev
+	libxkbcommon-dev
+	vulkan-headers
+	wayland-dev
+	wayland-protocols
+	"
+makedepends="
+	$depends_dev
+	cairo-dev
+	cups-dev
+	expat-dev
+	fontconfig-dev
+	gettext-dev
+	gi-docgen
+	gnutls-dev
+	gobject-introspection-dev
+	graphene-dev
+	gst-plugins-bad-dev
+	gstreamer-dev
+	iso-codes-dev
+	libice-dev
+	librsvg-dev
+	libx11-dev
+	libxcomposite-dev
+	libxcursor-dev
+	libxdamage-dev
+	libxfixes-dev
+	libxrandr-dev
+	meson
+	pango-dev
+	perl
+	py3-docutils
+	sassc
+	shaderc
+	tiff-dev
+	vulkan-loader-dev
+	zlib-dev
+	"
+subpackages="
+	$pkgname-dbg
+	$pkgname-demo
+	$pkgname-dev
+	$pkgname-doc
+	$pkgname-lang
+	"
+_repo_url="https://gitlab.gnome.org/GNOME/gtk.git"
+source="https://download.gnome.org/sources/gtk/${_pkgver%.*}/gtk-$_pkgver.tar.xz
+	0001-broadway-add-missing-generated-header-deps-to-gtk4-b.patch
+	0002-gsk-fallback-to-cairo-when-render-texture-fails.patch
+	
+	"
+builddir="$srcdir/gtk-$_pkgver"
+
+build() {
+	CFLAGS="$CFLAGS -O2" \
+	CPPFLAGS="$CPPFLAGS -O2" \
+	abuild-meson \
+		-Ddocumentation=true \
+		-Dintrospection=enabled \
+		-Dbroadway-backend=true \
+		-Dprint-cups=enabled \
+		-Dman-pages=true \
+		-Dbuild-tests=false \
+		-Dbuild-testsuite=false \
+		. output
+	meson compile -C output
+}
+
+package() {
+	DESTDIR="$pkgdir" meson install --no-rebuild -C output
+
+	# use gtk4-update-icon-cache from gtk+3.0 for now. The icon cache is forward
+	# compatible so this is fine.
+	rm "$pkgdir"/usr/bin/gtk4-update-icon-cache
+	rm "$pkgdir"/usr/share/man/man1/gtk4-update-icon-cache.1
+}
+
+demo() {
+	pkgdesc="$pkgdesc (demonstration application)"
+	amove \
+		usr/bin/gtk4-demo \
+		usr/bin/gtk4-demo-application \
+		usr/bin/gtk4-node-editor \
+		usr/bin/gtk4-print-editor \
+		usr/bin/gtk4-widget-factory \
+		usr/share/applications/org.gtk.Demo4.desktop \
+		usr/share/applications/org.gtk.PrintEditor4.desktop \
+		usr/share/applications/org.gtk.WidgetFactory4.desktop \
+		usr/share/applications/org.gtk.gtk4.NodeEditor.desktop \
+		usr/share/glib-2.0/schemas/org.gtk.Demo4.gschema.xml \
+		usr/share/gtk-4.0/gtk4builder.rng \
+		usr/share/icons \
+		usr/share/metainfo
+}
+
+dev() {
+	default_dev
+
+	amove \
+		usr/bin/gtk4-builder-tool \
+		usr/bin/gtk4-query-settings \
+		usr/share/gtk-4.0/valgrind
+}
+
+lang() {
+	default_lang
+
+	# These are some localized emoji labels.
+	amove usr/share/gtk-4.0/emoji
+}
+
+sha512sums="
+0e088442279c67a8f4c29bba979efe7e68bb1885a26da292035efc86425c462d1894476ea0e8bb4a08b5ad884f3eb3980782540a1cba89af5773852109af0ceb  gtk-4.24.1.tar.xz
+3eea5307b053fa35d1b306982e58a4405b253e0a7dc8448d28e486226f32e6bdb13ff0aff59c77159dbe2932a8ddd2aee8fdf0ee045b26850f4113d1f42bc295  0001-broadway-add-missing-generated-header-deps-to-gtk4-b.patch
+0da4a3b9da17268111e8ce36404fba3cd39688e029c61a250901d68895c79b2ef1bca716ccdf9e916fbcd5364551446093397d58228b2c81b59f16691d2335ac  0002-gsk-fallback-to-cairo-when-render-texture-fails.patch
+"
