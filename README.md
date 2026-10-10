@@ -314,20 +314,20 @@ A first image already carries GPU/display, Bluetooth, WLAN and modem firmware,
 the joan UCM profile, and the VoLTE metapackage (`lg-joan-volte` →
 `joan-imsd`, ModemManager, 81voltd, rmtfs, Calls). Hardware status:
 
-| subsystem | state in this image (linux-lg-joan r55, 2026-10-07) |
+| subsystem | state in this image (linux-lg-joan 7.3.0_rc6-r6, 2026-10-10) |
 |---|---|
 | display / GPU | panel, touch, backlight; Adreno 540 at 257–710 MHz (GLES 3.1) |
-| CPU | silver 300–1900.8 MHz, gold 300–2361.6 MHz all-core and 2457.6 MHz single-core (LG's rated bin-2 table), schedutil |
+| CPU | silver 300–1900.8 MHz, gold 300–2361.6 MHz all-core and 2457.6 MHz single-core (LG's per-speed-bin tables; bin 2 measured), schedutil |
 | thermal | LG's policy: 85 °C core/GPU trips, DRAM throttle, skin ladder, charge current by skin temperature |
 | battery / charging | fuel gauge %, charging to 4395 mV, full-charge reported |
 | audio | speaker, headphones (ES9218P), microphones through PipeWire + the joan UCM profile |
 | video | hardware decode (Venus) for GStreamer, FFmpeg and Firefox |
 | Wi-Fi / Bluetooth | WCN3990; stable MAC addresses from bootmac |
 | cellular | data auto-connects and comes back after reconnects, modem restarts and Wi-Fi hand-offs; IPv6-only SIMs also get IPv4 through 464XLAT (`clatd`, only when the network offers NAT64 and no native IPv4); VoLTE via joan-imsd is set up by hand (`FIRST-INSTALL-VOLTE.md`) |
-| camera | rear IMX351 captures through libcamera; Snapshot on screen not yet confirmed |
+| camera | all three (IMX351 main, S5K3M3 wide, HI553 front) capture through libcamera and show in Snapshot; photo capture needs GSK_RENDERER=cairo until a GTK GL crash is fixed; front image washed out pending ISP tuning |
 | NFC | PN547 with neard; `nfc-tags` app |
 | FM radio | tuner works (`/dev/radio0`); no audio path yet |
-| USB-C display | not working yet |
+| USB-C display | DP alt-mode support merged in the kernel (r5); not yet validated on device |
 
 Default apps added by `device-lg-joan` on top of Phosh's (Calls, Chatty,
 Snapshot, ...): `gnome-sound-recorder`, `pwvucontrol`, `nfc-tags`.
