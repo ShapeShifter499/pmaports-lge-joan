@@ -1,0 +1,80 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lance <Gero3977@gmail.com>
+Date: Sat, 10 Oct 2026 02:36:55 -0700
+Subject: [PATCH] libcamera: Add sensor helpers for the Samsung S5K3M3 and
+ Hynix HI553
+
+The LG V30 has two more cameras next to its IMX351 main camera: an S5K3M3
+13 MP wide camera and an HI553 5 MP front camera. Both now have kernel
+drivers that expose the analogue gain register as V4L2_CID_ANALOGUE_GAIN,
+and without a helper the software ISP AGC treats the register code as a
+linear gain.
+
+The conversions are the ones LG sensor libraries for the V30 perform
+(US998 stock firmware, disassembled):
+
+- libmmcamera_s5k3m3.so clamps the requested gain to [1.0, 16.0] and
+  returns (u32)(gain * 32 + 0.5); its inverse multiplies the code by
+  1/32. The kernel driver exposes codes [32, 512].
+- libmmcamera_hi553.so clamps to [1.0, 16.0] and writes
+  (gain - 1.0) * 16; the kernel driver exposes codes [0, 240]. This is
+  the same model as the existing HM1246 helper.
+
+Black levels, unit cell sizes and sensor delays are left to the tuning
+files and the defaults.
+
+Signed-off-by: Lance <Gero3977@gmail.com>
+Assisted-by: Claude-Code:claude-opus-5-5
+---
+ src/ipa/libipa/camera_sensor_helper.cpp | 28 +++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/src/ipa/libipa/camera_sensor_helper.cpp b/src/ipa/libipa/camera_sensor_helper.cpp
+index 0ea73c5..290b84f 100644
+--- a/src/ipa/libipa/camera_sensor_helper.cpp
++++ b/src/ipa/libipa/camera_sensor_helper.cpp
+@@ -520,6 +520,20 @@ public:
+ };
+ REGISTER_CAMERA_SENSOR_HELPER("gc08a3", CameraSensorHelperGc08a3)
+ 
++class CameraSensorHelperHi553 : public CameraSensorHelper
++{
++public:
++	CameraSensorHelperHi553()
++	{
++		/*
++		 * gain = (code + 16) / 16, code = [0, 240], x1 to x16, the
++		 * conversion the vendor sensor library uses.
++		 */
++		gain_ = AnalogueGainLinear{ 1, 16, 0, 16 };
++	}
++};
++REGISTER_CAMERA_SENSOR_HELPER("hi553", CameraSensorHelperHi553)
++
+ class CameraSensorHelperHm1246 : public CameraSensorHelper
+ {
+ public:
+@@ -853,6 +867,20 @@ public:
+ };
+ REGISTER_CAMERA_SENSOR_HELPER("vd55g1", CameraSensorHelperVd55g1)
+ 
++class CameraSensorHelperS5k3m3 : public CameraSensorHelper
++{
++public:
++	CameraSensorHelperS5k3m3()
++	{
++		/*
++		 * gain = code / 32, code = [32, 512], x1 to x16, the conversion
++		 * the vendor sensor library uses.
++		 */
++		gain_ = AnalogueGainLinear{ 1, 0, 0, 32 };
++	}
++};
++REGISTER_CAMERA_SENSOR_HELPER("s5k3m3", CameraSensorHelperS5k3m3)
++
+ class CameraSensorHelperVd56g3 : public CameraSensorHelper
+ {
+ public:
+-- 
+2.55.0
+

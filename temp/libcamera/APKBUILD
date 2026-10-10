@@ -3,7 +3,7 @@ maintainer="Robert Mader <robert.mader@collabora.com>"
 pkgname=libcamera
 _pkgver=0.7.2
 pkgver=9999$_pkgver
-pkgrel=6
+pkgrel=7
 pkgdesc="Linux camera framework"
 url="https://libcamera.org/"
 arch="all"
@@ -70,6 +70,7 @@ source="https://gitlab.freedesktop.org/camera/libcamera/-/archive/v$_pkgver/libc
 	0007-simple-Limit-swISP-output-sizes.patch
 	0008-libcamera-Add-quad-Bayer-CFA-layout-support.patch
 	0009-libcamera-Add-sensor-helper-and-properties-for-the-S.patch
+	0010-libcamera-Add-sensor-helpers-for-the-Samsung-S5K3M3-.patch
 	qcam.desktop
 	$_tuning_files
 	"
@@ -193,6 +194,7 @@ de5fd287fea2c71754beb7d72a6fd739a94ec7a47ed3ea09a60130bee1c08efdcf94e12b1830914e
 ac4e3c742fde4f8e4775bd2afbaaecb18fa49b869eb4309032bae985680f97443353eb384de19a9b588b632bb1711f82c318e0431214afe09068910b2e901252  0007-simple-Limit-swISP-output-sizes.patch
 2b8ee82c974a0a54279700c70dc8973038f5e1b517cade87872319d5f0b5aa9be6df0a827a9098da3fb498238b1fe080419e9950e34def0edadca0247794f269  0008-libcamera-Add-quad-Bayer-CFA-layout-support.patch
 9215de0c0b8da2407f40af83ab754ac84d2b6afd2966167ed29f367cfcbbed7a1d84a4f4bf575357b15b613da13cf7975073dc47effd22aecaa8b2b5cac98ba0  0009-libcamera-Add-sensor-helper-and-properties-for-the-S.patch
+71e3263e54cd0a988c34c81c7462a631b9d51e909d2d3085ea97a50b712943dd39645047411648816f24ff7a29db0aa73ae294643e9c4a6ecfbc6bae7b70d405  0010-libcamera-Add-sensor-helpers-for-the-Samsung-S5K3M3-.patch
 22167a4eceb6d1b40b0b7c45fdf116c71684f5340de7f767535cb8e160ad9d2ae0f00cb3d461f73a344520a48a4641cf46226841d78bee06bfbfd2a91337f754  qcam.desktop
 2ee566653b17d565d2c0de67cbe6ebad25df5aac6051cad78e6bae52016fa2ca0247e964d735ac776b3e0bd447ead9c4fcb26cd7629228cdba3ceb91b46f378f  hi846.yaml
 996ddbe43f99406a4023e2fb7fbab1d51056123071d864942289c97f99d16c3a87000823c64b4c0fed422674c5beb0f736ee279f8ee9dfca54b054b7a96a0fb1  imx351.yaml
