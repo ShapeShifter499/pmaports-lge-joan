@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lg-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=27
+pkgrel=28
 url="https://postmarketos.org"
 license="MIT"
 provides="device-lge-joan=$pkgver-r$pkgrel"
@@ -22,6 +22,7 @@ depends="
 	lg-joan-volte
 	lg-joan-cellular-data
 	linux-lg-joan
+	megapixels
 	mkbootimg
 	neard
 	nfc-tags
@@ -50,6 +51,8 @@ source="deviceinfo
 	90-lg-joan.preset
 	73-joan-feedbackd.rules
 	org.neard.service
+	megapixels-lg-joan.conf
+	
 	"
 
 build() {
@@ -94,6 +97,12 @@ package() {
 	install -Dm644 "$srcdir"/73-joan-feedbackd.rules \
 		"$pkgdir"/usr/lib/udev/rules.d/73-joan-feedbackd.rules
 
+	# Megapixels: second camera app that drives the CAMSS raw pipeline
+	# directly (no GStreamer-GL in-process). Config matches the live
+	# topology: imx351/s5k3m3/hi553 on their own csid/ispif/vfe lanes.
+	install -Dm644 "$srcdir"/megapixels-lg-joan.conf \
+		"$pkgdir"/usr/share/megapixels/config/lg,joan.conf
+
 	# WebRTC noise suppression / echo cancellation on the mic
 	install -Dm644 "$srcdir"/50-joan-echo-cancel.conf \
 		"$pkgdir"/usr/share/pipewire/pipewire.conf.d/50-joan-echo-cancel.conf
@@ -121,4 +130,5 @@ f85c89c67727bb8ed01c80b21466527c371a280a70a9a6fb336b52219e0239232b55e97fdc8a6964
 aa76e1f24ed8c7ed2527c10fde44b5d13a0e9d14b1a939a4cb72254e2593772cd19852f8ec7320a2f83a833aaffe0ef18bb941ec3aa9f350136c3698a2429656  90-lg-joan.preset
 2f2044e35d830cb3333277105df3b7e1071ac4b00aebc06e72f05bd6cd8ee4de0bd554be3f662de344346a423f1df411b107888c86bf0708845e953a71a0d0fa  73-joan-feedbackd.rules
 7b2632a017b291a84c15694a52afc56c57cb5d79ad48bd217078ff75b35904abad0dba4c3e5ff258adad125a7cd2619033782ec14e52572f85568377764b4dea  org.neard.service
+bea2218d75a7d173bbeeb76cc77f8949d62d7ef7931276cea72dc5ed4431861ae14dac8174c317a82788a6c358bcfd480955f7aac8436078456ab7c689fb6762  megapixels-lg-joan.conf
 "

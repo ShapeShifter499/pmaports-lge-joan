@@ -1,0 +1,17 @@
+--- a/src/pipeline.c
++++ b/src/pipeline.c
+@@ -24,7 +24,13 @@
+ 	link.sink.index = sink_index;
+ 
+ 	if (xioctl(camera->media_fd, MEDIA_IOC_SETUP_LINK, &link) == -1) {
+-		return -1;
++		/* Links that are IMMUTABLE|ENABLED (e.g. qcom-camss sensor links)
++		 * reject a request that omits IMMUTABLE with EINVAL, since it looks
++		 * like an attempt to clear the flag. Retry preserving it. */
++		link.flags |= MEDIA_LNK_FL_IMMUTABLE;
++		if (xioctl(camera->media_fd, MEDIA_IOC_SETUP_LINK, &link) == -1) {
++			return -1;
++		}
+ 	}
+ 	return 0;
+ }

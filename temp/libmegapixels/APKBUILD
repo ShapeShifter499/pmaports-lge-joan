@@ -1,0 +1,36 @@
+# Forked from Alpine (community/libmegapixels 0.2.3-r0): qcom-camss IMMUTABLE
+# sensor links need their flag preserved in MEDIA_IOC_SETUP_LINK (joan).
+maintainer="Stefan Hansson <newbyte@postmarketos.org>"
+pkgname=libmegapixels
+_pkgver=0.2.3
+pkgver=9999$_pkgver
+pkgrel=0
+pkgdesc="Device abstraction for the Megapixels application"
+url="https://libme.gapixels.me"
+arch="all"
+license="GPL-3.0-or-later"
+builddir="$srcdir/libmegapixels-$_pkgver"
+makedepends="libconfig-dev linux-headers meson"
+subpackages="$pkgname-dev"
+source="
+	0001-setup-link-preserve-immutable.patch
+	https://gitlab.com/megapixels-org/libmegapixels/-/archive/$_pkgver/libmegapixels-$_pkgver.tar.gz"
+
+build() {
+	abuild-meson \
+		output .
+	meson compile -C output
+}
+
+check() {
+	meson test --print-errorlogs -C output
+}
+
+package() {
+	DESTDIR="$pkgdir" meson install --no-rebuild -C output
+}
+
+sha512sums="
+0f96556a4fe738c1f18d5ce77c7cca5ca621494ed503704254e35445a2ea6de70a9d8fe89ce43a92e361b3594db6106ec87c4231e160d38b71425cb78c324e19  0001-setup-link-preserve-immutable.patch
+7ba62991b8ad3f06ef0797d873874e5367eb2ac2793b72df7a668d9aa4cbff9719a9b83c73b6dc41bebc658a137a3a31aecea62e6dee775c7eda1a7354c57430  libmegapixels-0.2.3.tar.gz
+"
