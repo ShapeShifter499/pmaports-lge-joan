@@ -5,7 +5,7 @@ maintainer="team/gnome <achill@achill.org>"
 pkgname=gtk4.0
 _pkgver=4.24.1
 pkgver=9999$_pkgver
-pkgrel=1
+pkgrel=2
 # NOTE: Upgrade only to even-numbered versions (e.g. 1.18.x, 1.20.x)!
 pkgdesc="The GTK Toolkit (v4)"
 url="https://www.gtk.org/"
@@ -139,5 +139,5 @@ lang() {
 sha512sums="
 0e088442279c67a8f4c29bba979efe7e68bb1885a26da292035efc86425c462d1894476ea0e8bb4a08b5ad884f3eb3980782540a1cba89af5773852109af0ceb  gtk-4.24.1.tar.xz
 3eea5307b053fa35d1b306982e58a4405b253e0a7dc8448d28e486226f32e6bdb13ff0aff59c77159dbe2932a8ddd2aee8fdf0ee045b26850f4113d1f42bc295  0001-broadway-add-missing-generated-header-deps-to-gtk4-b.patch
-0da4a3b9da17268111e8ce36404fba3cd39688e029c61a250901d68895c79b2ef1bca716ccdf9e916fbcd5364551446093397d58228b2c81b59f16691d2335ac  0002-gsk-fallback-to-cairo-when-render-texture-fails.patch
+a4dfd2aa4d875a94d973105e079ec9a5ed541f88538c33648a2afb3a43a0715676e3e0587d74b92570e5550d10f9f6194b4b3e9325cb455e46e96ece231136b9  0002-gsk-fallback-to-cairo-when-render-texture-fails.patch
 "

@@ -1,0 +1,50 @@
+# Forked from Alpine (community/megapixels 2.1.0-r0): camera switch
+# leaves the shared EGLDisplay dead, so the next GtkGLArea frame must
+# not issue GL calls when no context is current.
+# Contributor: Martijn Braam <martijn@brixit.nl>
+# Maintainer: Oliver Smith <ollieparanoid@postmarketos.org>
+pkgname=megapixels
+_pkgver=2.1.0
+pkgver=9999$_pkgver
+pkgrel=0
+pkgdesc="GTK+4 camera app for mobile devices"
+url="https://gitlab.com/megapixels-org/Megapixels"
+# s390x: doubt anyone would use a mainframe to take photosj
+arch="all !s390x"
+license="GPL-3.0-only"
+# Required by postprocess.sh
+# depends="cmd:dcraw_emu cmd:convert cmd:exiftool"
+depends="libraw-tools imagemagick exiftool"
+makedepends="
+	feedbackd-dev
+	glib-dev
+	gperf
+	gtk4.0-dev
+	libdng-dev
+	libmegapixels-dev
+	libxrandr-dev
+	meson
+	pulseaudio-dev
+	tiff-dev>=4.6.0t
+	zbar-dev
+	"
+source="
+	0001-survive-preview-redraw-after-egl-teardown.patch
+	https://gitlab.com/megapixels-org/Megapixels/-/archive/$_pkgver/Megapixels-$_pkgver.tar.bz2
+	"
+options="!check" # There's no testsuite
+builddir="$srcdir/Megapixels-$_pkgver"
+
+build() {
+	abuild-meson . output
+	meson compile -C output
+}
+
+package() {
+	DESTDIR="$pkgdir" meson install --no-rebuild -C output
+}
+
+sha512sums="
+829f12598244385a1fce04b343de3354c68f2d377d68b8ae130d4c9a188744ba52387749f4d462529db7bf9c25cfc391545f91c0531f7e81200311b2fd516dcb  0001-survive-preview-redraw-after-egl-teardown.patch
+0269e3d119abe3ae9a2a69e6796329429a8b54e8bb3f4928c62a54cef5c665abb152d55f0d9d07ab53cd81b397b0d7e81b3a1dff0f6f1b15a2713d5c0e193c88  Megapixels-2.1.0.tar.bz2
+"

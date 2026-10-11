@@ -1,0 +1,37 @@
+--- a/src/gl_util.c
++++ b/src/gl_util.c
+@@ -11,6 +11,10 @@
+ void
+ gl_util_check_error(const char *file, int line)
+ {
++        if (gdk_gl_context_get_current() == NULL) {
++                return;
++        }
++
+         GLenum error = glGetError();
+ 
+         const char *name;
+@@ -49,7 +53,9 @@
+                     size_t num_extra)
+ {
+         GdkGLContext *context = gdk_gl_context_get_current();
+-        assert(context);
++        if (context == NULL) {
++                return 0;
++        }
+ 
+         GLuint shader = glCreateShader(type);
+         if (shader == 0) {
+--- a/src/main.c
++++ b/src/main.c
+@@ -446,7 +446,9 @@
+ static gboolean
+ preview_draw(GtkGLArea *area, GdkGLContext *ctx, gpointer data)
+ {
+-        if (gtk_gl_area_get_error(area) != NULL) {
++        gtk_gl_area_make_current(area);
++        if (gtk_gl_area_get_error(area) != NULL ||
++            gdk_gl_context_get_current() == NULL) {
+                 return FALSE;
+         }
+ 

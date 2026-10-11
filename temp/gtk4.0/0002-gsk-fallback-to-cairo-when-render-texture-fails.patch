@@ -65,13 +65,17 @@
  
    rounded_viewport = GRAPHENE_RECT_INIT (viewport->origin.x,
                                           viewport->origin.y,
-@@ -462,7 +486,8 @@
+@@ -462,7 +486,12 @@
    timestamp = g_get_monotonic_time ();
    gsk_gpu_device_maybe_gc (priv->device, timestamp);
  
 -  gsk_gpu_renderer_make_current (self);
 +  if (!gsk_gpu_renderer_ensure_current (self))
-+    return;
++    {
++      /* Frame path. make_current failed, so submit an empty frame. */
++      gdk_draw_context_empty_frame (priv->context);
++      return;
++    }
  
    frame = gsk_gpu_renderer_get_frame (self);
    scale = gdk_surface_get_scale (gdk_draw_context_get_surface (priv->context));
