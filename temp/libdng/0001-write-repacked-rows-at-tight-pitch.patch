@@ -1,0 +1,34 @@
+--- a/src/libdng.c
++++ b/src/libdng.c
+@@ -399,6 +399,17 @@
+ 	return 1;
+ }
+ 
++static unsigned int
++repacked_row_bytes(unsigned int width, unsigned int bit_depth)
++{
++	uint64_t bits = (uint64_t) width * bit_depth;
++	uint64_t rem = bits % 8;
++
++	if (rem == 0)
++		return (unsigned int) (bits / 8);
++	return (unsigned int) ((bits + 8 - rem) / 8);
++}
++
+ int
+ libdng_write(libdng_info *dng, const char *path, unsigned int width, unsigned int height, const uint8_t *data,
+ 	size_t length)
+@@ -534,7 +545,12 @@
+ 	TIFFSetField(tif, DNGTAG_CFAPATTERN, 4, dng->cfapattern);
+ 	TIFFSetField(tif, DNGTAG_WHITELEVEL, 1, &dng->whitelevel);
+ 
+-	unsigned int stride = dng->stride;
++	/* Repack emits a tight buffer. dng->stride is v4l2 bytesperline and was
++	 * already consumed as source-row padding inside libdng_repack(). Indexing
++	 * the tight buffer with that pitch (or with 0) shears every row. */
++	unsigned int stride = dng->needs_repack
++		? repacked_row_bytes(width, dng->bit_depth)
++		: dng->stride;
+ 	for (int row = 0; row < height; row++) {
+ 		TIFFWriteScanline(tif, (void *) raw_frame + (row * stride), row, 0);
+ 	}
