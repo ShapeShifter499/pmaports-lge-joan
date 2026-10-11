@@ -1,0 +1,13 @@
+[Unit]
+Description=joan: restart the ADSP when the sound card is missing at boot
+Documentation=file:///usr/share/doc/joan-adsp-watchdog/README
+# On a good boot the card registers ~12 s after power-on (ADSP -> QRTR ->
+# SLIMbus QMI 769 -> WCD9340 -> msm-snd-sdm845). Run after multi-user so
+# the 25 s wait mostly elapses in parallel with the rest of boot.
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/joan-adsp-watchdog
+# 25 s first wait + stop/start + 20 s second wait, with headroom.
+TimeoutStartSec=120

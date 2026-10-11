@@ -1,0 +1,7 @@
+# joan ADSP audio watchdog + boot probe (see the joan-adsp-watchdog
+# package). The watchdog is a oneshot: it only ever restarts the ADSP when
+# the sound card is missing. The recheck timer runs it once more at
+# t+3 min as a bounded second attempt. The boot probe is diagnostics only.
+enable joan-adsp-watchdog.service
+enable joan-adsp-watchdog-recheck.timer
+enable joan-adsp-boot-probe.service

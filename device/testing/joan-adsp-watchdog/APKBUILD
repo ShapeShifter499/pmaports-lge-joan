@@ -1,0 +1,45 @@
+# Reference: <https://postmarketos.org/devicepkg>
+maintainer="Lance <Gero3977@gmail.com>"
+pkgname=joan-adsp-watchdog
+pkgver=0.1
+pkgrel=0
+pkgdesc="LG V30 (joan): recover the sound card when the ADSP boots without QRTR services"
+url="https://github.com/ShapeShifter499/linux-lg-v30-joan"
+arch="noarch"
+license="MIT"
+depends="qrtr"
+options="!check"
+source="
+	85-joan-adsp-watchdog.preset
+	joan-adsp-boot-probe
+	joan-adsp-boot-probe.service
+	joan-adsp-watchdog
+	joan-adsp-watchdog-recheck.timer
+	joan-adsp-watchdog.service
+	README.md
+	"
+
+package() {
+	install -Dm755 "$srcdir"/joan-adsp-watchdog \
+		"$pkgdir"/usr/libexec/joan-adsp-watchdog
+	install -Dm755 "$srcdir"/joan-adsp-boot-probe \
+		"$pkgdir"/usr/libexec/joan-adsp-boot-probe
+	install -Dm644 -t "$pkgdir"/usr/lib/systemd/system \
+		"$srcdir"/joan-adsp-watchdog.service \
+		"$srcdir"/joan-adsp-watchdog-recheck.timer \
+		"$srcdir"/joan-adsp-boot-probe.service
+	install -Dm644 "$srcdir"/85-joan-adsp-watchdog.preset \
+		"$pkgdir"/usr/lib/systemd/system-preset/85-joan-adsp-watchdog.preset
+	install -Dm644 "$srcdir"/README.md \
+		"$pkgdir"/usr/share/doc/joan-adsp-watchdog/README.md
+}
+
+sha512sums="
+	81cd6110469cff6ee44fdd48e57897110f881bb542a5764d02b96a60fb6dfc5e6a5d00a02fc50db61cde6dca113863c39d702cc3028ec01f367a90c4679b9322  85-joan-adsp-watchdog.preset
+	38bbb9cc596e2422cf5a7e63db862fe2edad73724a13f02ccd86580d4d9ed3f8c28666a6f024d2a2289f9c221e32c6bb218b4a7429a5fd71e7d57eb80848cdbf  joan-adsp-boot-probe
+	78683e50518bda1015a53fd74e504e3b8469ca70de93782a5fe11af82e0a62f2921487ead3fd848236339b476cc41190264ab9af953be7b79f7fc886ad282ec7  joan-adsp-boot-probe.service
+	1ff339486675a6bf15c857f6e2c39745af495cfa7a4e7f25ebc9e1f3235ca42662c5f3c2ac667400ddbd497766e74f7ec68e04ae448aaf247f48229fc167a4e2  joan-adsp-watchdog
+	a0c51dae8606f4246d1cd6c5cd6d6268cdb085cbf59b76802372a3546d6680ce8cddc5a56c16e5598f22a5b931acd58e851b4205af2029a944530a8dcea39ddf  joan-adsp-watchdog-recheck.timer
+	d0bb8d1807f5dce17523b53e0a65406fb30320ef2e4a49848e150bb1b0d8fa0de9ab83eceb44d9e290f52fbdc45be56ff9113efe4a5f19b2c9834ef114b4848c  joan-adsp-watchdog.service
+	74d7e0011c91b6ff3d425cf2c40d0c3b7c1dc5e65806bf282fa48c3c284d5f086c46d519ec0a427d5a495706caafc7916b6c96df6da1af92719e1d16aa41bb0e  README.md
+	"

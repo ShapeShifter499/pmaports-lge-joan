@@ -1,0 +1,161 @@
+#!/bin/sh
+# joan ADSP audio watchdog.
+#
+# Bug being mitigated (2026-10-07): on roughly 1 of 8 boots the ADSP comes
+# up (remoteproc "running", APR services present) but its QRTR services
+# never appear on the ADSP node (no SLIMbus QMI service 769), so slim-ngd
+# never enumerates the WCD9340 codec and msm-snd-sdm845 fails with
+# "SLIM Playback: codec dai not found" -> no sound card.
+#
+# Root-cause candidates (both fixed upstream after 7.2-rc2, verified
+# absent from linux-lg-joan r57; both apply cleanly to our tree):
+#   - 786439ad5876 "rpmsg: glink: smem: order FIFO read after
+#     availability check": a speculative FIFO read drops a packet. The
+#     ADSP announces its QRTR services in one burst; losing the HELLO or
+#     the burst leaves the node silent.
+#   - 544d85de4dc2 "net: qrtr: Send HELLO message on endpoint register":
+#     the 7.2-rc2 name service never re-sends HELLO, so any loss is
+#     permanent for the ADSP power-cycle.
+#
+# LIVE EVIDENCE (2026-10-07, this bench): two coordinated ADSP
+# stop/start cycles on a healthy system re-announced only 5/6 and then
+# 0/6 node-5 services (769 lost both times) and the card did not come
+# back; the qrtr tracepoint ring showed the ADSP HELLO arriving and the
+# NS replying, with no NEW_SERVER burst following. Each ADSP restart
+# therefore re-rolls the announcement dice -> this watchdog retries a
+# BOUNDED number of stop/start cycles, verifying the card after each.
+# See lg-v30-port docs/evidence/2026-10-07-adsp-boot-race/.
+#
+# Safety: never touches a healthy ADSP (acts only when the card is
+# missing), never loops forever (bounded cycles per run, bounded runs
+# per boot), selects the remoteproc BY NAME (never number), and aborts
+# without improvisation if the kernel refuses a stop or start.
+#
+# Environment overrides (for testing):
+#   JOAN_ADSP_WATCHDOG_WAIT          seconds to wait for the card first
+#                                    (default 25)
+#   JOAN_ADSP_WATCHDOG_RESTART_WAIT  seconds to wait after each restart
+#                                    (default 20)
+#   JOAN_ADSP_WATCHDOG_CYCLES        stop/start cycles per run
+#                                    (default 3)
+#   JOAN_ADSP_WATCHDOG_DRYRUN        1 = observe and log only
+#
+# Exit codes: 0 card present (or recovered), 1 still broken, 2 env
+#             error, 3 dry-run stopped before any restart.
+
+TAG=joan-adsp-watchdog
+WAIT_FIRST="${JOAN_ADSP_WATCHDOG_WAIT:-25}"
+WAIT_RESTART="${JOAN_ADSP_WATCHDOG_RESTART_WAIT:-20}"
+CYCLES="${JOAN_ADSP_WATCHDOG_CYCLES:-3}"
+DRYRUN="${JOAN_ADSP_WATCHDOG_DRYRUN:-0}"
+
+log() {
+	logger -t "$TAG" "$*"
+}
+
+card_present() {
+	# The internal card registers with driver "sdm845" (machine driver
+	# msm-snd-sdm845); matching the driver avoids false positives from
+	# e.g. USB audio devices. On a bad boot there is no card at all.
+	grep -qs "sdm845" /proc/asound/cards
+}
+
+wait_for_card() {
+	n="$1"
+	i=0
+	while [ "$i" -lt "$n" ]; do
+		card_present && return 0
+		sleep 1
+		i=$((i + 1))
+	done
+	card_present
+}
+
+adsp_rproc_dir() {
+	# remoteproc numbering swaps between boots; only the name is stable.
+	for r in /sys/class/remoteproc/remoteproc*; do
+		[ -r "$r/name" ] || continue
+		if [ "$(cat "$r/name" 2>/dev/null)" = "adsp" ]; then
+			printf "%s\n" "$r"
+			return 0
+		fi
+	done
+	return 1
+}
+
+qrtr_node5_services() {
+	# number of services announced on the ADSP qrtr node (6 on a good
+	# boot, incl. SLIMbus control 769). Fields: svc ver inst node port.
+	qrtr-lookup 2>/dev/null | grep -cE \
+		"^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+[0-9]+[[:space:]]+5[[:space:]]+[0-9]+"
+}
+
+case "$WAIT_FIRST$WAIT_RESTART$CYCLES" in
+	*[^0-9]*) echo "joan-adsp-watchdog: non-numeric wait/cycle values" >&2; exit 2 ;;
+esac
+
+log "running: kernel $(uname -r), uptime $(cut -d. -f1 /proc/uptime)s, waiting up to ${WAIT_FIRST}s for the sound card"
+
+if wait_for_card "$WAIT_FIRST"; then
+	log "sound card present; ADSP healthy; nothing to do"
+	exit 0
+fi
+
+log "ALERT: no sound card after ${WAIT_FIRST}s; cards: [$(cat /proc/asound/cards 2>/dev/null | tr "\n" ";")]"
+
+if ! RPROC=$(adsp_rproc_dir); then
+	log "FATAL: no remoteproc named adsp found; giving up (no sound card, no recovery possible)"
+	exit 1
+fi
+log "adsp remoteproc at $RPROC state=$(cat "$RPROC/state" 2>/dev/null) node5_services=$(qrtr_node5_services)"
+
+if [ "$DRYRUN" = "1" ]; then
+	log "DRYRUN: would run up to $CYCLES stop/start cycles on the ADSP at $RPROC; not touching it"
+	exit 3
+fi
+
+cycle=1
+while [ "$cycle" -le "$CYCLES" ]; do
+	STATE=$(cat "$RPROC/state" 2>/dev/null)
+	case "$STATE" in
+	running)
+		log "cycle ${cycle}/${CYCLES}: restarting ADSP (stop)"
+		if echo stop > "$RPROC/state" 2>/dev/null; then
+			log "ADSP stop accepted; state now $(cat "$RPROC/state" 2>/dev/null)"
+		else
+			log "ADSP stop REFUSED; leaving the ADSP alone and giving up"
+			exit 1
+		fi
+		sleep 2
+		log "cycle ${cycle}/${CYCLES}: restarting ADSP (start)"
+		if echo start > "$RPROC/state" 2>/dev/null; then
+			log "ADSP start accepted; state now $(cat "$RPROC/state" 2>/dev/null)"
+		else
+			log "ADSP start REFUSED; state now $(cat "$RPROC/state" 2>/dev/null); giving up"
+			exit 1
+		fi
+		;;
+	offline)
+		log "cycle ${cycle}/${CYCLES}: ADSP is offline; starting it"
+		if echo start > "$RPROC/state" 2>/dev/null; then
+			log "ADSP start accepted"
+		else
+			log "ADSP start REFUSED; giving up"
+			exit 1
+		fi
+		;;
+	*)
+		log "cycle ${cycle}/${CYCLES}: ADSP state is '$STATE'; remoteproc recovery should handle it, waiting"
+		;;
+	esac
+
+	if wait_for_card "$WAIT_RESTART"; then
+		log "RECOVERED: sound card present after cycle ${cycle}/${CYCLES}; adsp state $(cat "$RPROC/state" 2>/dev/null), node5_services=$(qrtr_node5_services)"
+		exit 0
+	fi
+	log "cycle ${cycle}/${CYCLES}: still no card; adsp state $(cat "$RPROC/state" 2>/dev/null), node5_services=$(qrtr_node5_services)"
+	cycle=$((cycle + 1))
+done
+
+log "FAILED: no sound card after $CYCLES ADSP restart cycles; adsp state $(cat "$RPROC/state" 2>/dev/null), node5_services=$(qrtr_node5_services); manual investigation needed"
+exit 1

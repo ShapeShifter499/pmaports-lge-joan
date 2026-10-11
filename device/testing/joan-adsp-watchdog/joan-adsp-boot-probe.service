@@ -1,0 +1,13 @@
+[Unit]
+Description=joan: sample ADSP/QRTR/audio bring-up at t+5/15/30s
+Documentation=file:///usr/share/doc/joan-adsp-watchdog/README
+# Start as early as possible (in parallel; nothing waits on us) so the
+# samples line up with the ADSP bring-up (~12 s on a good boot) and the
+# qrtr tracepoints get enabled before the handshake happens.
+DefaultDependencies=no
+After=systemd-journald.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/joan-adsp-boot-probe
+TimeoutStartSec=90

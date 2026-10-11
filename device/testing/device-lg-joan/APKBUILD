@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lg-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=28
+pkgrel=29
 url="https://postmarketos.org"
 license="MIT"
 provides="device-lge-joan=$pkgver-r$pkgrel"
@@ -19,6 +19,7 @@ depends="
 	firmware-qcom-adreno-a530
 	fm-radio
 	gnome-sound-recorder
+	joan-adsp-watchdog
 	lg-joan-volte
 	lg-joan-cellular-data
 	linux-lg-joan

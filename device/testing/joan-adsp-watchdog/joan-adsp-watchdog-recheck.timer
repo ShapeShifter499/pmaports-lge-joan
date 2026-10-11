@@ -1,0 +1,10 @@
+[Unit]
+Description=joan: re-run the ADSP audio watchdog once, 3 min after boot
+
+[Timer]
+OnBootSec=3min
+AccuracySec=15s
+Unit=joan-adsp-watchdog.service
+
+[Install]
+WantedBy=timers.target

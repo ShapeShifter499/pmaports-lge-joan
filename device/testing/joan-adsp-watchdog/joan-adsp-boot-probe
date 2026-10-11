@@ -1,0 +1,70 @@
+#!/bin/sh
+# joan ADSP/QRTR/audio boot probe.
+#
+# Samples the ADSP bring-up state at (roughly) t+5/15/30 s after boot and
+# logs it to the journal under the tag "joan-adsp-boot-probe". Purpose:
+# catch the next natural "1 in 8 boots, no sound card" failure with the
+# evidence needed to discriminate the candidate root causes:
+#   - remoteproc adsp state per sample (running / crashed / offline)
+#   - full qrtr service list per sample (did node-5 services ever appear?)
+#   - /proc/asound/cards + /dev/snd per sample (when did the card register?)
+#   - qrtr kernel tracepoints (HELLO / new-server / server-add events)
+#   - filtered dmesg tail (qrtr|glink|adsp|slim|wcd|snd|asoc)
+#
+# Environment override (for testing): JOAN_ADSP_BOOT_PROBE_SAMPLES
+# (default "5 15 30", seconds after script start).
+
+TAG=joan-adsp-boot-probe
+TRACE=/sys/kernel/tracing
+SAMPLES="${JOAN_ADSP_BOOT_PROBE_SAMPLES:-5 15 30}"
+
+log() {
+	logger -t "$TAG" "$*"
+}
+
+sample() {
+	t="$1"
+	{
+		echo "--- joan-adsp-boot-probe sample t+${t}s epoch=$(date +%s) uptime=$(cut -d. -f1 /proc/uptime)s ---"
+		for r in /sys/class/remoteproc/remoteproc*; do
+			[ -r "$r/name" ] || continue
+			echo "remoteproc $(cat "$r/name" 2>/dev/null): $(cat "$r/state" 2>/dev/null)"
+		done
+		echo "-- qrtr services (qrtr-lookup) --"
+		qrtr-lookup 2>&1
+		echo "-- node5 service count --"
+		qrtr-lookup 2>/dev/null | grep -cE \
+			"^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+[0-9]+[[:space:]]+5[[:space:]]+[0-9]+"
+		echo "-- /proc/asound/cards --"
+		cat /proc/asound/cards 2>&1
+		echo "-- /dev/snd --"
+		ls /dev/snd 2>&1
+		echo "-- qrtr trace (tail) --"
+		tail -n 30 "$TRACE/trace" 2>/dev/null | grep -v "^#"
+		echo "-- kernel qrtr|glink|adsp|slim|wcd|snd|asoc (tail) --"
+		dmesg 2>/dev/null | grep -iE "qrtr|glink|adsp|slim|wcd|snd|asoc" | tail -n 40
+	} | logger -t "$TAG"
+}
+
+# Enable the qrtr tracepoints for the whole boot (best effort; they are
+# off by default and their ring keeps the handshake evidence until read).
+if [ -d "$TRACE/events/qrtr" ]; then
+	if echo 1 > "$TRACE/events/qrtr/enable" 2>/dev/null; then
+		log "qrtr tracepoints enabled ($TRACE/events/qrtr)"
+	else
+		log "could not enable qrtr tracepoints (permissions?)"
+	fi
+else
+	log "no qrtr tracepoint directory at $TRACE/events/qrtr"
+fi
+
+prev=0
+for t in $SAMPLES; do
+	delta=$((t - prev))
+	prev="$t"
+	[ "$delta" -gt 0 ] && sleep "$delta"
+	sample "$t"
+done
+
+log "done: $SAMPLES samples taken"
+exit 0
