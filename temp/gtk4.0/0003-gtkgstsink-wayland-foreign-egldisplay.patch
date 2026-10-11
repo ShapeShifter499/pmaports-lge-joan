@@ -1,0 +1,57 @@
+From: Lance <Gero3977@gmail.com>
+Date: Sat, 11 Oct 2026 05:35:00 +0000
+Subject: [PATCH] media/gtkgstsink: keep GDK's EGLDisplay alive on Wayland
+
+gtk_gst_sink_initialize_gl() wraps only the wl_display.  The
+GstGLDisplayEGL child that gst_gl_display_egl_from_gl_display() later
+attaches is returned non-foreign, so when the sink (or any GstGL
+decoration chain, e.g. Snapshot's shutter-sound gtk::MediaFile being
+dropped) finalizes it, its finalize calls eglTerminate() on the very
+EGLDisplay GDK initialized process-wide (gdk_display_prepare_gl).
+The next GTK frame then cannot make its GL context current: repeated
+"gdk_gl_context_make_current() failed" and a frozen viewfinder while
+the camera pipeline keeps running.  Regression in 4.24.1 exposed by
+9139597a74 ("gtkgstsink: release GL context on disposal"), which
+stopped the context leak that used to keep the display alive.
+
+Mark the child foreign right after wrapping, per the GStreamer API
+contract on gst_gl_display_egl_set_foreign(); identical to the fix
+GStreamer applied to its own Qt sinks for the same fault
+(gstreamer#2824 / gstreamer!8504).  Matches the fix proposed in
+GNOME/gtk#8456.
+
+Upstream: https://gitlab.gnome.org/GNOME/gtk/-/issues/8456
+
+--- a/gtk/media/gtkgstsink.c
++++ b/gtk/media/gtkgstsink.c
+@@ -38,6 +38,7 @@
+ #define HAVE_GST_WAYLAND_SUPPORT
+ #include <gdk/wayland/gdkwayland.h>
+ #include <gst/gl/wayland/gstgldisplay_wayland.h>
++#include <gst/gl/egl/gstgldisplay_egl.h>
+ #endif
+ 
+ #ifdef GDK_WINDOWING_WIN32
+@@ -891,6 +892,22 @@
+ 
+           wayland_display = gdk_wayland_display_get_wl_display (display);
+           self->gst_display = GST_GL_DISPLAY (gst_gl_display_wayland_new_with_display (wayland_display));
++
++          /* The GstGLDisplayEGL child derived from this wl_display is GDK's
++           * own EGLDisplay (Mesa returns the same handle for the same
++           * wl_display), and gst_gl_display_egl_from_gl_display() returns it
++           * non-foreign, so its finalize would eglTerminate() the display GDK
++           * is still using process-wide.  Mark it foreign; the parent display
++           * keeps it alive via its qdata reference.  Mirrors the Qt sinks'
++           * fix for the same fault (gstreamer!8504, since 1.26).
++           */
++          GstGLDisplayEGL *egl_display = gst_gl_display_egl_from_gl_display (self->gst_display);
++          if (egl_display)
++            {
++              gst_gl_display_egl_set_foreign (egl_display, TRUE);
++              gst_object_unref (egl_display);
++            }
++
+           self->gst_gdk_context = gst_gl_context_new_wrapped (self->gst_display, gl_handle, platform, gl_api);
+         }
+       else

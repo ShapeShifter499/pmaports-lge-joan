@@ -5,7 +5,7 @@ maintainer="team/gnome <achill@achill.org>"
 pkgname=gtk4.0
 _pkgver=4.24.1
 pkgver=9999$_pkgver
-pkgrel=2
+pkgrel=3
 # NOTE: Upgrade only to even-numbered versions (e.g. 1.18.x, 1.20.x)!
 pkgdesc="The GTK Toolkit (v4)"
 url="https://www.gtk.org/"
@@ -74,6 +74,7 @@ _repo_url="https://gitlab.gnome.org/GNOME/gtk.git"
 source="https://download.gnome.org/sources/gtk/${_pkgver%.*}/gtk-$_pkgver.tar.xz
 	0001-broadway-add-missing-generated-header-deps-to-gtk4-b.patch
 	0002-gsk-fallback-to-cairo-when-render-texture-fails.patch
+	0003-gtkgstsink-wayland-foreign-egldisplay.patch
 	
 	"
 builddir="$srcdir/gtk-$_pkgver"
@@ -140,4 +141,5 @@ sha512sums="
 0e088442279c67a8f4c29bba979efe7e68bb1885a26da292035efc86425c462d1894476ea0e8bb4a08b5ad884f3eb3980782540a1cba89af5773852109af0ceb  gtk-4.24.1.tar.xz
 3eea5307b053fa35d1b306982e58a4405b253e0a7dc8448d28e486226f32e6bdb13ff0aff59c77159dbe2932a8ddd2aee8fdf0ee045b26850f4113d1f42bc295  0001-broadway-add-missing-generated-header-deps-to-gtk4-b.patch
 a4dfd2aa4d875a94d973105e079ec9a5ed541f88538c33648a2afb3a43a0715676e3e0587d74b92570e5550d10f9f6194b4b3e9325cb455e46e96ece231136b9  0002-gsk-fallback-to-cairo-when-render-texture-fails.patch
+cc1bfe840d01fd731b5425fc86195dcccd8d14947e090f202364132a3c0dc4f1d03a2c39fb33c9324acff969c62e0fbcdca1ae0acc06b60d4702b28b8e1b2a82  0003-gtkgstsink-wayland-foreign-egldisplay.patch
 "
