@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=alsa-ucm-conf-lg-joan
 pkgver=1.0
-pkgrel=7
+pkgrel=9
 pkgdesc="ALSA UCM profile for the LG V30 (joan) sound card"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -18,16 +18,18 @@ source="
 
 package() {
 	# Entry point, named after the card ID: alsa-lib's UCM2 loader looks for
-	# ucm2/<Vendor>/<CardId>/<CardId>.conf, and our card ID is LGV30 (no hyphen),
-	# which does not match the card long name LG-V30 used by the old conf.d alias.
+	# ucm2/<CardId>/<CardId>.conf at the TOP level of ucm2, not under a vendor
+	# subdirectory (alsa-lib does not find ucm2/Qualcomm/LGV30). Our card ID is
+	# LGV30 (no hyphen), which does not match the card long name LG-V30 that the
+	# old conf.d alias was named after.
 	install -Dm644 "$srcdir/LGV30.conf" \
-		"$pkgdir/usr/share/alsa/ucm2/Qualcomm/LGV30/LGV30.conf"
+		"$pkgdir/usr/share/alsa/ucm2/LGV30/LGV30.conf"
 
 	install -Dm644 "$srcdir/HiFi.conf" \
-		"$pkgdir/usr/share/alsa/ucm2/Qualcomm/LGV30/HiFi.conf"
+		"$pkgdir/usr/share/alsa/ucm2/LGV30/HiFi.conf"
 }
 
 sha512sums="
-e7c0373ff827fc9b075cb4dd97399365a3503841176a752f8c91ec0bee1040a38ad6ef0bf7f779a24ad86481afe84fb2f68648e172385f6f0eb60b1833532e21  LGV30.conf
-ace8ce54d62eddee9ac01e041f289db9889c5c603adcec9d8e6d799b45c2349129ec84e3ed886de7cd693a69e6ba70e5d4a8b55a80081967849be5ffbee91220  HiFi.conf
+bccf563f1e5ab0e59ab8ef645acb0ff16e8f7a836e0660b186362a6f728be07937705f1799969ae4295067bff516832df9a2710664003e239da608181479afba  LGV30.conf
+a0bfdaa0963b313968449d8c8f8642a5af1605ce5823746dc185f7d5ceb3481df818e597482efaa37cfdeed64e4ed3db155467859d225b322dc86c548f0ae49f  HiFi.conf
 "
