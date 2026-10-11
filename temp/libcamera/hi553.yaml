@@ -10,7 +10,9 @@ version: 1
 algorithms:
   - BlackLevel:
       # Stock linearization pedestal 260 @ 12 bit = 65.00 @ 10 bit; 16-bit scale here.
-      blackLevel: 4160
+      # Same 8-bit truncation as s5k3m3: 4160 >> 8 = 16, applying 64 instead
+      # of 65. 4096 is the closest representable value (err -1.00 @ 10 bit).
+      blackLevel: 4096
   - Awb:
       # Ignored by libcamera 0.7.2 (no Awb tuning there). Upstream master (libipa
       # AwbGrey) uses it only for manual ColourTemperature. Stock AWB reference

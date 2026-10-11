@@ -10,7 +10,13 @@ version: 1
 algorithms:
   - BlackLevel:
       # Stock linearization pedestal 253 @ 12 bit = 63.25 @ 10 bit; 16-bit scale here.
-      blackLevel: 4048
+      # libcamera 0.7.2 simple IPA keeps this at 8-bit precision only
+      # (ipa/simple/algorithms/blc.cpp: definedLevel_ = value >> 8), so only
+      # multiples of 256 survive; anything else is truncated. 4048 >> 8 = 15,
+      # which applies 60 @ 10 bit instead of 63.25 -- a 5.1% black-level error
+      # that inflates this sensor's estimated CCT by ~175 K. 4096 is the
+      # closest representable value (64 @ 10 bit, err +0.75).
+      blackLevel: 4096
   - Awb:
       # Ignored by libcamera 0.7.2 (no Awb tuning there). Upstream master (libipa
       # AwbGrey) uses it only for manual ColourTemperature. Stock AWB reference
