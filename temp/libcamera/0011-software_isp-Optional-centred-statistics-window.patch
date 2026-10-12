@@ -1,0 +1,231 @@
+diff --git a/include/libcamera/internal/software_isp/software_isp.h b/include/libcamera/internal/software_isp/software_isp.h
+index 4f72dce..0aabe3a 100644
+--- a/include/libcamera/internal/software_isp/software_isp.h
++++ b/include/libcamera/internal/software_isp/software_isp.h
+@@ -100,6 +100,7 @@ private:
+ 	DebayerParams debayerParams_;
+ 	DmaBufAllocator dmaHeap_;
+ 	bool ccmEnabled_;
++	uint32_t statsWindowPercent_;
+ 
+ 	std::unique_ptr<ipa::soft::IPAProxySoft> ipa_;
+ 	std::deque<FrameBuffer *> queuedInputBuffers_;
+diff --git a/include/libcamera/ipa/soft.mojom b/include/libcamera/ipa/soft.mojom
+index 77328c5..d5f7e77 100644
+--- a/include/libcamera/ipa/soft.mojom
++++ b/include/libcamera/ipa/soft.mojom
+@@ -18,7 +18,8 @@ interface IPASoftInterface {
+ 	     libcamera.SharedFD fdParams,
+ 	     libcamera.IPACameraSensorInfo sensorInfo,
+ 	     libcamera.ControlInfoMap sensorControls)
+-		=> (int32 ret, libcamera.ControlInfoMap ipaControls, bool ccmEnabled);
++		=> (int32 ret, libcamera.ControlInfoMap ipaControls, bool ccmEnabled,
++		    uint32 statsWindowPercent);
+ 	start() => (int32 ret);
+ 	stop();
+ 	configure(IPAConfigInfo configInfo)
+diff --git a/src/ipa/simple/soft_simple.cpp b/src/ipa/simple/soft_simple.cpp
+index 8bffd2a..eb33050 100644
+--- a/src/ipa/simple/soft_simple.cpp
++++ b/src/ipa/simple/soft_simple.cpp
+@@ -58,7 +58,8 @@ public:
+ 		 const IPACameraSensorInfo &sensorInfo,
+ 		 const ControlInfoMap &sensorControls,
+ 		 ControlInfoMap *ipaControls,
+-		 bool *ccmEnabled) override;
++		 bool *ccmEnabled,
++		 uint32_t *statsWindowPercent) override;
+ 	int configure(const IPAConfigInfo &configInfo) override;
+ 
+ 	int start() override;
+@@ -98,7 +99,8 @@ int IPASoftSimple::init(const IPASettings &settings,
+ 			const IPACameraSensorInfo &sensorInfo,
+ 			const ControlInfoMap &sensorControls,
+ 			ControlInfoMap *ipaControls,
+-			bool *ccmEnabled)
++			bool *ccmEnabled,
++			uint32_t *statsWindowPercent)
+ {
+ 	camHelper_ = CameraSensorHelperFactoryBase::create(settings.sensorModel);
+ 	if (!camHelper_) {
+@@ -138,6 +140,26 @@ int IPASoftSimple::init(const IPASettings &settings,
+ 
+ 	*ccmEnabled = context_.ccmEnabled;
+ 
++	/*
++	 * Optionally restrict the AWB/AGC statistics to a centred fraction of
++	 * the frame. Lens shading biases whole-frame statistics, which makes
++	 * cameras with different shading disagree about the colour temperature
++	 * of the same scene. Absent (or 0 / >= 100) keeps the full frame, i.e.
++	 * the upstream behaviour, so sensors without this key are unaffected.
++	 */
++	*statsWindowPercent = 0;
++	if (data->contains("statsWindowPercent")) {
++		unsigned int percent = (*data)["statsWindowPercent"].get<uint32_t>(0);
++		if (percent > 100) {
++			LOG(IPASoft, Warning)
++				<< "Ignoring out of range statsWindowPercent " << percent;
++			percent = 0;
++		}
++		*statsWindowPercent = percent;
++		LOG(IPASoft, Debug)
++			<< "Statistics window " << percent << "% of the frame";
++	}
++
+ 	params_ = nullptr;
+ 	stats_ = nullptr;
+ 
+diff --git a/src/libcamera/software_isp/debayer.h b/src/libcamera/software_isp/debayer.h
+index 6c52ed0..41e7f7d 100644
+--- a/src/libcamera/software_isp/debayer.h
++++ b/src/libcamera/software_isp/debayer.h
+@@ -40,7 +40,7 @@ public:
+ 
+ 	virtual int configure(const StreamConfiguration &inputCfg,
+ 			      const std::vector<std::reference_wrapper<const StreamConfiguration>> &outputCfgs,
+-			      bool ccmEnabled) = 0;
++			      bool ccmEnabled, uint32_t statsWindowPercent) = 0;
+ 
+ 	virtual std::vector<PixelFormat> formats(PixelFormat inputFormat) = 0;
+ 
+@@ -87,6 +87,30 @@ private:
+ 	virtual Size patternSize(PixelFormat inputFormat) = 0;
+ 
+ protected:
++	/*
++	 * Compute the statistics window for the processed window \a window and
++	 * the tuning-provided \a percent. A percent of 0 (or of 100 and above)
++	 * selects the whole processed window, which is the upstream behaviour.
++	 *
++	 * Otherwise the window is restricted to a centred \a percent of the
++	 * processed window. Lens shading biases whole-frame statistics, so
++	 * cameras whose lenses shade in opposite directions disagree about the
++	 * colour temperature of the same scene; ignoring the frame edges where
++	 * the shading is strongest removes most of that disagreement.
++	 */
++	static Rectangle statsWindow(const Rectangle &window, unsigned int percent)
++	{
++		if (percent == 0 || percent >= 100)
++			return Rectangle(window.size());
++
++		unsigned int width = window.width * percent / 100;
++		unsigned int height = window.height * percent / 100;
++
++		return Rectangle(window.x + (window.width - width) / 2,
++				  window.y + (window.height - height) / 2,
++				  width, height);
++	}
++
+ 	void dmaSyncBegin(std::vector<DmaSyncer> &dmaSyncers, FrameBuffer *input, FrameBuffer *output);
+ 	static bool isStandardBayerOrder(BayerFormat::Order order);
+ };
+diff --git a/src/libcamera/software_isp/debayer_cpu.cpp b/src/libcamera/software_isp/debayer_cpu.cpp
+index 2c2c1dd..481427e 100644
+--- a/src/libcamera/software_isp/debayer_cpu.cpp
++++ b/src/libcamera/software_isp/debayer_cpu.cpp
+@@ -641,7 +641,8 @@ int DebayerCpu::setDebayerFunctions(PixelFormat inputFormat,
+ 
+ int DebayerCpu::configure(const StreamConfiguration &inputCfg,
+ 			  const std::vector<std::reference_wrapper<const StreamConfiguration>> &outputCfgs,
+-			  bool ccmEnabled)
++			  bool ccmEnabled,
++			  uint32_t statsWindowPercent)
+ {
+ 	if (getInputConfig(inputCfg.pixelFormat, inputConfig_) != 0)
+ 		return -EINVAL;
+@@ -704,11 +705,13 @@ int DebayerCpu::configure(const StreamConfiguration &inputCfg,
+ 	window_.height = outputCfg.size.height;
+ 
+ 	/*
+-	 * Set the stats window to the whole processed window. Its coordinates are
+-	 * relative to the debayered area since debayering passes only the part of
+-	 * data to be processed to the stats; see SwStatsCpu::setWindow.
++	 * Set the stats window. Its coordinates are relative to the debayered
++	 * area since debayering passes only the part of data to be processed to
++	 * the stats; see SwStatsCpu::setWindow. statsWindowPercent optionally
++	 * restricts it to a centred fraction of the processed window; see
++	 * Debayer::statsWindow().
+ 	 */
+-	stats_->setWindow(Rectangle(window_.size()));
++	stats_->setWindow(statsWindow(window_, statsWindowPercent));
+ 
+ 	unsigned int yStart = 0;
+ 	unsigned int linesPerThread = (window_.height / threads_.size()) &
+diff --git a/src/libcamera/software_isp/debayer_cpu.h b/src/libcamera/software_isp/debayer_cpu.h
+index 5281c65..73c4b6e 100644
+--- a/src/libcamera/software_isp/debayer_cpu.h
++++ b/src/libcamera/software_isp/debayer_cpu.h
+@@ -37,7 +37,7 @@ public:
+ 
+ 	int configure(const StreamConfiguration &inputCfg,
+ 		      const std::vector<std::reference_wrapper<const StreamConfiguration>> &outputCfgs,
+-		      bool ccmEnabled) override;
++		      bool ccmEnabled, uint32_t statsWindowPercent) override;
+ 	Size patternSize(PixelFormat inputFormat) override;
+ 	std::vector<PixelFormat> formats(PixelFormat input) override;
+ 	std::tuple<unsigned int, unsigned int>
+diff --git a/src/libcamera/software_isp/debayer_egl.cpp b/src/libcamera/software_isp/debayer_egl.cpp
+index f8cf81d..5add38f 100644
+--- a/src/libcamera/software_isp/debayer_egl.cpp
++++ b/src/libcamera/software_isp/debayer_egl.cpp
+@@ -291,7 +291,8 @@ int DebayerEGL::initBayerShaders(PixelFormat inputFormat, PixelFormat outputForm
+ 
+ int DebayerEGL::configure(const StreamConfiguration &inputCfg,
+ 			  const std::vector<std::reference_wrapper<const StreamConfiguration>> &outputCfgs,
+-			  [[maybe_unused]] bool ccmEnabled)
++			  [[maybe_unused]] bool ccmEnabled,
++			  [[maybe_unused]] uint32_t statsWindowPercent)
+ {
+ 	if (getInputConfig(inputCfg.pixelFormat, inputConfig_) != 0)
+ 		return -EINVAL;
+@@ -353,8 +354,13 @@ int DebayerEGL::configure(const StreamConfiguration &inputCfg,
+ 	/*
+ 	 * Don't pass x,y from window_ since process() already adjusts for it.
+ 	 * But crop the window to 2/3 of its width and height for speedup.
++	 *
++	 * statsWindowPercent optionally restricts the statistics to a centred
++	 * fraction of the window; see Debayer::statsWindow(). Quad Bayer keeps
++	 * the full window, as its statistics need the whole pattern.
+ 	 */
+-	stats_->setWindow(quadBayer_ ? window_ : Rectangle(window_.size()));
++	stats_->setWindow(quadBayer_ ? window_
++			       : statsWindow(window_, statsWindowPercent));
+ 
+ 	inputBufferCount_ = inputCfg.bufferCount;
+ 	outputBufferCount_ = outputCfg.bufferCount;
+diff --git a/src/libcamera/software_isp/debayer_egl.h b/src/libcamera/software_isp/debayer_egl.h
+index 8e6b4af..005ac3a 100644
+--- a/src/libcamera/software_isp/debayer_egl.h
++++ b/src/libcamera/software_isp/debayer_egl.h
+@@ -47,7 +47,7 @@ public:
+ 
+ 	int configure(const StreamConfiguration &inputCfg,
+ 		      const std::vector<std::reference_wrapper<const StreamConfiguration>> &outputCfgs,
+-		      bool ccmEnabled) override;
++		      bool ccmEnabled, uint32_t statsWindowPercent) override;
+ 
+ 	Size patternSize(PixelFormat inputFormat) override;
+ 
+diff --git a/src/libcamera/software_isp/software_isp.cpp b/src/libcamera/software_isp/software_isp.cpp
+index 74973d9..a763dcd 100644
+--- a/src/libcamera/software_isp/software_isp.cpp
++++ b/src/libcamera/software_isp/software_isp.cpp
+@@ -172,7 +172,8 @@ SoftwareIsp::SoftwareIsp(PipelineHandler *pipe, const CameraSensor *sensor,
+ 			 sensorInfo,
+ 			 sensor->controls(),
+ 			 ipaControls,
+-			 &ccmEnabled_);
++			 &ccmEnabled_,
++			 &statsWindowPercent_);
+ 	if (ret) {
+ 		LOG(SoftwareIsp, Error) << "IPA init failed";
+ 		debayer_.reset();
+@@ -301,7 +302,7 @@ int SoftwareIsp::configure(const StreamConfiguration &inputCfg,
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	ret = debayer_->configure(inputCfg, outputCfgs, ccmEnabled_);
++	ret = debayer_->configure(inputCfg, outputCfgs, ccmEnabled_, statsWindowPercent_);
+ 	if (ret < 0)
+ 		return ret;
+ 

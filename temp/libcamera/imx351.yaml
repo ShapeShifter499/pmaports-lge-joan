@@ -7,6 +7,14 @@
 %YAML 1.1
 ---
 version: 1
+# Restrict the AWB/AGC statistics to the centred 40% of the frame. Lens
+# shading is uncorrected here (the software ISP has no LSC stage) and it
+# drifts in opposite directions between the two rear cameras, which made
+# whole-frame grey-world AWB report different colour temperatures for the
+# same scene. Measured on paired captures: a centred 40% window brought the
+# two rear cameras from 742 K apart to 21 K apart. Requires the
+# statsWindowPercent support in patch 0011; absent or 0 keeps the whole frame.
+statsWindowPercent: 40
 algorithms:
   - BlackLevel:
       # Stock linearization pedestal 256 @ 12 bit = 64.00 @ 10 bit; 16-bit scale here.
