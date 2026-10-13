@@ -69,10 +69,15 @@ were checked with a Goertzel filter at 1 kHz against 950/1050 Hz.
 
 ## Known limits
 
-- **No jack detection** (MBHC). Neither headphone device has a
-  `JackControl`, so they are always listed and are picked by hand.
-- **DEC8/TX8 records zeros** on mainline. The top mic uses DEC7/TX7, which is
-  also what LG's dual-mic paths use.
+- **Jack detection (MBHC) does not work yet.** The headphone devices and the
+  headset mic carry `JackControl` ("Headphone Jack" / "Headset Mic Jack") as
+  on the sdm845 phones, so they show as unplugged until MBHC reports a plug.
+  Without the controls their availability was "unknown", and the session made
+  the headphones and the headset mic the defaults on every boot, which left
+  the speaker silent.
+- **The top mic uses DEC7/TX7.** DEC8 recorded zeros on mainline until
+  wcd934x got the ADC MUX8 register fix (in linux-lg-joan r9). It now works,
+  which leaves it free for a later dual-mic device (LG pairs TX7 and TX8).
 - **No Voice Call verb yet.**
 - **TX COPP Topology stays "None".** LG's SM ECNS topology makes the COPP
   open fail on this firmware.

@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=alsa-ucm-conf-lg-joan
 pkgver=1.0
-pkgrel=11
+pkgrel=12
 pkgdesc="ALSA UCM profile for the LG V30 (joan) sound card"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -33,5 +33,5 @@ package() {
 
 sha512sums="
 7c97c24daee50b0e129e88e3d336b9913b253c9b305535b91e3d9511d75895075241012885391e800872dde43a21b56a751d3dc584e2b75e68bf2d59ac09d10b  joan.conf
-ac32ef21d578b8fd53e9ecad873fdc4a96a0c2b2203417f30ade179c6de9ebb22c558a87f5506e65831c3c503a55023919f9a0ce5f91720054d27732da954aae  HiFi.conf
+25428a6d75691d69c6706aee2f0eca1a1afd6ec5ae0467066db207a4451df7a0e031a004edb33cf2f7c6e375bd6e49b6a7a5f76122783eefb52b5ba61f8b71ea  HiFi.conf
 "
