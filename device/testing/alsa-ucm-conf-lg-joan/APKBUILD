@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=alsa-ucm-conf-lg-joan
 pkgver=1.0
-pkgrel=9
+pkgrel=11
 pkgdesc="ALSA UCM profile for the LG V30 (joan) sound card"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -12,24 +12,26 @@ replaces="alsa-ucm-conf-lge-joan"
 depends="alsa-ucm-conf"
 options="!check"
 source="
-	LGV30.conf
+	joan.conf
 	HiFi.conf
 	"
 
 package() {
-	# Entry point, named after the card ID: alsa-lib's UCM2 loader looks for
-	# ucm2/<CardId>/<CardId>.conf at the TOP level of ucm2, not under a vendor
-	# subdirectory (alsa-lib does not find ucm2/Qualcomm/LGV30). Our card ID is
-	# LGV30 (no hyphen), which does not match the card long name LG-V30 that the
-	# old conf.d alias was named after.
-	install -Dm644 "$srcdir/LGV30.conf" \
-		"$pkgdir/usr/share/alsa/ucm2/LGV30/LGV30.conf"
+	# Same layout as the sdm845 phones: the profile lives under a vendor
+	# directory and conf.d/<card driver>/<card long name>.conf points at it.
+	# alsa-lib probes conf.d/sdm845/LG-V30.conf for this card (driver
+	# "sdm845", long name "LG-V30").
+	install -Dm644 "$srcdir"/joan.conf \
+		"$pkgdir"/usr/share/alsa/ucm2/LG/joan/joan.conf
+	install -Dm644 "$srcdir"/HiFi.conf \
+		"$pkgdir"/usr/share/alsa/ucm2/LG/joan/HiFi.conf
 
-	install -Dm644 "$srcdir/HiFi.conf" \
-		"$pkgdir/usr/share/alsa/ucm2/LGV30/HiFi.conf"
+	mkdir -p "$pkgdir"/usr/share/alsa/ucm2/conf.d/sdm845
+	ln -s ../../LG/joan/joan.conf \
+		"$pkgdir"/usr/share/alsa/ucm2/conf.d/sdm845/LG-V30.conf
 }
 
 sha512sums="
-bccf563f1e5ab0e59ab8ef645acb0ff16e8f7a836e0660b186362a6f728be07937705f1799969ae4295067bff516832df9a2710664003e239da608181479afba  LGV30.conf
-a0bfdaa0963b313968449d8c8f8642a5af1605ce5823746dc185f7d5ceb3481df818e597482efaa37cfdeed64e4ed3db155467859d225b322dc86c548f0ae49f  HiFi.conf
+7c97c24daee50b0e129e88e3d336b9913b253c9b305535b91e3d9511d75895075241012885391e800872dde43a21b56a751d3dc584e2b75e68bf2d59ac09d10b  joan.conf
+ac32ef21d578b8fd53e9ecad873fdc4a96a0c2b2203417f30ade179c6de9ebb22c558a87f5506e65831c3c503a55023919f9a0ce5f91720054d27732da954aae  HiFi.conf
 "
