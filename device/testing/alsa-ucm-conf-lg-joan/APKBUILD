@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=alsa-ucm-conf-lg-joan
 pkgver=1.0
-pkgrel=12
+pkgrel=13
 pkgdesc="ALSA UCM profile for the LG V30 (joan) sound card"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -14,6 +14,7 @@ options="!check"
 source="
 	joan.conf
 	HiFi.conf
+	VoiceCall.conf
 	"
 
 package() {
@@ -25,6 +26,8 @@ package() {
 		"$pkgdir"/usr/share/alsa/ucm2/LG/joan/joan.conf
 	install -Dm644 "$srcdir"/HiFi.conf \
 		"$pkgdir"/usr/share/alsa/ucm2/LG/joan/HiFi.conf
+	install -Dm644 "$srcdir"/VoiceCall.conf \
+		"$pkgdir"/usr/share/alsa/ucm2/LG/joan/VoiceCall.conf
 
 	mkdir -p "$pkgdir"/usr/share/alsa/ucm2/conf.d/sdm845
 	ln -s ../../LG/joan/joan.conf \
@@ -32,6 +35,7 @@ package() {
 }
 
 sha512sums="
-7c97c24daee50b0e129e88e3d336b9913b253c9b305535b91e3d9511d75895075241012885391e800872dde43a21b56a751d3dc584e2b75e68bf2d59ac09d10b  joan.conf
+cd40816163261e7ecc09cbcbe46cfc7ff841b34fb1490beac7f1af2a6164eb39025d8fd094202510e3e21f9be61e92c2f524b5f1467a8123069dc75b8ac02f92  joan.conf
 25428a6d75691d69c6706aee2f0eca1a1afd6ec5ae0467066db207a4451df7a0e031a004edb33cf2f7c6e375bd6e49b6a7a5f76122783eefb52b5ba61f8b71ea  HiFi.conf
+2eac231f9b684f29d5f2d8299cded7a47d2c2429cb4db66cfbebc115372079a3a02dfcd9fda9d57232f6b2ce35bcc5823175c2831e8e7afc0c471c57dd357938  VoiceCall.conf
 "
