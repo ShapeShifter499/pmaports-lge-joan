@@ -1168,7 +1168,8 @@ def main() -> int:
     src_b = socket.inet_pton(socket.AF_INET6, src)
     dst_b = socket.inet_pton(socket.AF_INET6, target)
     sa = None
-    if os.environ.get("JOAN_IMS_NO_BRIDGE") != "1" and mode == "register":
+    # Opt-in: registration through kernel ESP does not complete yet.
+    if os.environ.get("JOAN_IMS_KERNEL_ESP") == "1" and mode == "register":
         try:
             ue_sec = ipsec.SecAgree(pcscf_sec.alg, pcscf_sec.ealg, spi_c, spi_s, port_c, port_s)
             sa = KernelSa(src, target, ue_sec, pcscf_sec, ck, ik)
