@@ -1,0 +1,44 @@
+From: Aurel Nymvale <Gero3977@gmail.com>
+Subject: [PATCH] map: add joan LSM6DSE and fix ICM40604 orientation keys
+
+LG V30 sensor registry data uses group 1001 with keys 720-722 for
+LSM6DSE orientation. It also uses group 1010 with keys 800-802 for
+ICM40604, while the existing map accidentally starts that group at key
+700.
+
+Signed-off-by: Lance <Gero3977@gmail.com>
+Assisted-by: Hermes-Agent:openai-codex/gpt-5.6-sol
+---
+diff --git a/map.c b/map.c
+index 2dfe34e..4012f6c 100644
+--- a/map.c
++++ b/map.c
+@@ -33,19 +33,27 @@ const struct group groups[] = {
+ 	{ 1000,
+ 		{
+ 			{ 700, 1 },
+ 			{ 701, 1 },
+ 			{ 702, 1 },
+ 			{ /* sentinel */ }
+ 		},
+ 	},
++	{ 1001,
++		{
++			{ 720, 1 },
++			{ 721, 1 },
++			{ 722, 1 },
++			{ /* sentinel */ }
++		},
++	},
+ 	{ 1010,
+ 		{
+-			{ 700, 1 },
++			{ 800, 1 },
+ 			{ 801, 1 },
+ 			{ 802, 1 },
+ 			{ /* sentinel */ }
+ 		},
+ 	},
+ 	{ 1020,
+ 		{
+ 			{ 900, 1 },

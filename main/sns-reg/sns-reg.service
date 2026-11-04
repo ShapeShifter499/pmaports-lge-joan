@@ -1,0 +1,11 @@
+[Unit]
+Description=Qualcomm Sensor Registry server
+ConditionPathExists=/etc/sns-reg.d/registry.conf
+
+[Service]
+ExecStart=/usr/sbin/sns-reg
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=basic.target

@@ -1,26 +1,36 @@
 # Maintainer: Yassine Oudjana (Tooniis) <y.oudjana@protonmail.com>
 pkgname=sns-reg
-pkgver=0.1
+pkgver=0_git20250706
 pkgrel=0
-pkgdesc="Qualcomm Sensor Registry Server"
+pkgdesc="Qualcomm Sensor Registry server"
 url="https://gitlab.com/msm8996-mainline/sns-reg"
 arch="armv7 aarch64"
 license="GPL-3.0-or-later"
 makedepends="scons qrtr-dev"
-source="$pkgname-$pkgver.zip::$url/-/archive/$pkgver/$pkgname-$pkgver.zip"
+subpackages="$pkgname-openrc $pkgname-systemd"
+_commit="4d238e5f0baba3fb77456fe2bffbf8e8f18a71a0"
+source="
+	$pkgname-$_commit.tar.gz::$url/-/archive/$_commit/$pkgname-$_commit.tar.gz
+	0001-map-add-joan-orientation-groups.patch
+	$pkgname.service
+"
+builddir="$srcdir/$pkgname-$_commit"
 options="!check"
 
 build() {
-	pwd
 	scons
 }
 
 package() {
 	install -Dm755 "$pkgname" "$pkgdir/usr/sbin/$pkgname"
 	install -Dm755 "$pkgname.initd" "$pkgdir/etc/init.d/$pkgname"
+	install -Dm644 "$srcdir/$pkgname.service" \
+		"$pkgdir/usr/lib/systemd/system/$pkgname.service"
 	install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/COPYING"
 }
 
 sha512sums="
-810357d9b7b204c8d875107a17db528c387ceb246f1eea3176877daaec74822f930c060f5e7be613186f612457a68bf738e48ac5cc18a498d44c5bcb484ba457  sns-reg-0.1.zip
+5174bd26f74a1a332c526823c661592b831ee0719c2eb373ed6d40863214f24bea92a4d51567333187a05815a35243a25f5d7b4e174f3995c5c00d70afcad83e  sns-reg-4d238e5f0baba3fb77456fe2bffbf8e8f18a71a0.tar.gz
+6c071199e664476ec68f13b2b88f305476c1150a3a78059463547134287db09819eb12e062dd98b4c88558717e4190806a44edb1bafdec733ac106176e7f8c86  0001-map-add-joan-orientation-groups.patch
+de4109fa7538bef47e9705ac7e8973bae5069848fb7e390c78938c0fc030d23e8e27bc4ac92ce28695fc60c3f2bde0b05f986ab6feb49344e8beaca670054728  sns-reg.service
 "
