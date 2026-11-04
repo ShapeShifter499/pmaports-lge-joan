@@ -10,6 +10,7 @@ One call at a time, which is also all GNOME Calls allows on an account.
 """
 import os
 import pwd
+import re
 import select
 import socket
 import subprocess
@@ -21,6 +22,7 @@ LOCAL_IP = "127.0.0.1"
 SIP_PORT = 5070
 RTP_PORT_LOCAL = 40002
 RTP_PORT_IMS = 40000
+CARD = "alsa_card.platform-sound"
 
 
 # Compact header names, which sofia-sip uses.
@@ -96,6 +98,46 @@ def set_call_audio(active):
     print("CALL_AUDIO", "on" if active else "off")
 
 
+class SpeakerFollower(threading.Thread):
+    """Apply the in-call speaker button.
+
+    PipeWire will not put two devices that share a PCM in one profile, so the
+    earpiece and speaker are separate Voice Call profiles, while callaudiod
+    only switches ports inside a sink. It still records the button in
+    SpeakerState, so follow that for the length of the call.
+    """
+
+    PROFILES = {0: "Voice Call (Earpiece, Mic1)", 1: "Voice Call (Mic1, Speaker)"}
+
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.name_, self.uid = session_user()
+        self.proc = None
+
+    def user_cmd(self, *cmd):
+        return ["sudo", "-u", self.name_, "env", f"XDG_RUNTIME_DIR=/run/user/{self.uid}",
+                f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{self.uid}/bus", *cmd]
+
+    def run(self):
+        if not self.name_:
+            return
+        self.proc = subprocess.Popen(
+            self.user_cmd("gdbus", "monitor", "--session",
+                          "--dest", "org.mobian_project.CallAudio"),
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        for line in self.proc.stdout:
+            found = re.search(r"'SpeakerState': <(?:uint32 )?(\d+)>", line)
+            if found and int(found.group(1)) in self.PROFILES:
+                profile = self.PROFILES[int(found.group(1))]
+                subprocess.run(self.user_cmd("pactl", "set-card-profile", CARD, profile),
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print("SPEAKER_PROFILE", profile)
+
+    def stop(self):
+        if self.proc:
+            self.proc.terminate()
+
+
 def number_from_uri(uri):
     """The user part of a sip: or tel: URI, without parameters."""
     uri = uri.strip().strip("<>")
@@ -162,6 +204,7 @@ class Bridge:
         self.relay = None
         self.call = None
         self.call_audio = False
+        self.speaker = None
 
     # ---- local (GNOME Calls) side -------------------------------------
     def local_response(self, hdrs, code, reason, addr, body="", to_tag=None):
@@ -290,6 +333,8 @@ class Bridge:
         # Before Calls opens its audio: the switch replaces the sinks.
         self.call_audio = True
         set_call_audio(True)
+        self.speaker = SpeakerFollower()
+        self.speaker.start()
 
     def on_local_response(self, first, hdrs, body):
         call = self.call
@@ -448,6 +493,9 @@ class Bridge:
         if self.call_audio:
             self.call_audio = False
             set_call_audio(False)
+        if self.speaker:
+            self.speaker.stop()
+            self.speaker = None
         self.call = None
         print("CALL_ENDED")
 
