@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import re
+import select
 import socket
 import struct
 import subprocess
@@ -179,15 +180,18 @@ def ensure_ims_bearer() -> tuple[str | None, str | None]:
     return find_ims_bearer()
 
 
-def apply_bearer_ipv6(path: str, iface: str) -> None:
+def apply_bearer_ipv6(path: str, iface: str) -> str | None:
     """Nothing else configures the IMS bearer, so apply what the modem gave it."""
     b = mm_kv("-b", path)
     addr = b.get("bearer.ipv6-config.address", "--")
     prefix = b.get("bearer.ipv6-config.prefix", "--")
     if addr == "--" or prefix == "--":
-        return
+        return None
+    # The network only delivers to the address it assigned, not a privacy one.
+    sudo(["sysctl", "-q", f"net.ipv6.conf.{iface}.use_tempaddr=0"])
     sudo(["ip", "link", "set", iface, "up"])
     sudo(["ip", "-6", "addr", "replace", f"{addr}/{prefix}", "dev", iface])
+    return addr
 
 
 def wds_pcscf(mux_id: int):
@@ -452,6 +456,106 @@ class EspSa:
             text = sip.decode("utf-8", "replace")
             return text, sip_headers(text)
         raise socket.timeout
+
+
+class KernelSa:
+    """The IMS security associations in the kernel, with plain sockets on top.
+
+    Same send()/recv() as EspSa. The kernel also carries TCP, which the network
+    uses for incoming calls, and which user-space ESP cannot.
+    """
+
+    def __init__(self, src, target, ue_sec, pcscf_sec, ck, ik):
+        self.conns = {}
+        self.reply = None
+        for mod in ("esp6", "xfrm_user"):
+            subprocess.run(["modprobe", mod], check=True)
+        subprocess.run(["ip", "xfrm", "policy", "flush"], check=True)
+        subprocess.run(["ip", "xfrm", "state", "flush"], check=True)
+        for sa in ipsec.four_sas(ue=src, pcscf=target, ue_sec=ue_sec, pcscf_sec=pcscf_sec,
+                                 ck=ck, ik=ik):
+            subprocess.run([
+                "ip", "xfrm", "state", "add", "src", sa.src, "dst", sa.dst, "proto", "esp",
+                "spi", str(sa.spi), "mode", "transport",
+                "auth-trunc", "hmac(sha1)", "0x" + ik.hex(), "96",
+                "enc", "cbc(aes)", "0x" + ck[:16].hex(),
+            ], check=True)
+            for proto in ("udp", "tcp"):
+                subprocess.run([
+                    "ip", "xfrm", "policy", "add", "src", sa.src, "dst", sa.dst,
+                    "proto", proto, "sport", str(sa.sport), "dport", str(sa.dport),
+                    "dir", sa.direction, "tmpl", "src", sa.src, "dst", sa.dst,
+                    "proto", "esp", "mode", "transport",
+                ], check=True)
+        self.client = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.client.bind((src, ue_sec.port_c))
+        self.client.connect((target, pcscf_sec.port_s))
+        self.server = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server.bind((src, ue_sec.port_s))
+        self.listener = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.listener.bind((src, ue_sec.port_s))
+        self.listener.listen(4)
+        print("KERNEL_ESP_UP")
+
+    def send(self, sip: bytes) -> int:
+        # A response goes back the way its request came.
+        if sip.startswith(b"SIP/2.0") and self.reply:
+            kind, target = self.reply
+            if kind == "tcp":
+                target.sendall(sip)
+                return len(sip)
+            return self.server.sendto(sip, target)
+        return self.client.send(sip)
+
+    def frame(self, conn):
+        """One SIP message from a TCP stream, or None if it is incomplete."""
+        buf = self.conns[conn]
+        head, sep, rest = buf.partition(b"\r\n\r\n")
+        if not sep:
+            return None
+        m = re.search(rb"(?im)^(?:content-length|l)\s*:\s*(\d+)", head)
+        need = int(m.group(1)) if m else 0
+        if len(rest) < need:
+            return None
+        self.conns[conn] = rest[need:]
+        return head + sep + rest[:need]
+
+    def recv(self, timeout=8) -> tuple[str, dict]:
+        deadline = time.time() + timeout
+        while True:
+            for conn in list(self.conns):
+                msg = self.frame(conn)
+                if msg:
+                    self.reply = ("tcp", conn)
+                    text = msg.decode("utf-8", "replace")
+                    return text, sip_headers(text)
+            remain = deadline - time.time()
+            if remain <= 0:
+                raise socket.timeout
+            socks = [self.client, self.server, self.listener] + list(self.conns)
+            ready, _, _ = select.select(socks, [], [], remain)
+            if not ready:
+                raise socket.timeout
+            for s in ready:
+                if s is self.listener:
+                    conn, addr = s.accept()
+                    self.conns[conn] = b""
+                    print("IMS_TCP_ACCEPT")
+                elif s in self.conns:
+                    data = s.recv(16384)
+                    if data:
+                        self.conns[s] += data
+                    else:
+                        del self.conns[s]
+                        s.close()
+                else:
+                    data, addr = s.recvfrom(16384)
+                    self.reply = ("udp", addr) if s is self.server else None
+                    text = data.decode("utf-8", "replace")
+                    return text, sip_headers(text)
 
 
 def sip_response(req: str, code: int, reason: str, *, to_tag: str, src: str, port_c: int, body: str = "", extra: list[str] | None = None) -> bytes:
@@ -889,9 +993,9 @@ def main() -> int:
     if not iface:
         print("NO_IMS_BEARER")
         return 2
-    apply_bearer_ipv6(bearer, iface)
+    assigned = apply_bearer_ipv6(bearer, iface)
     mux_id = iface_mux_id(iface)
-    src = global_ipv6(iface)
+    src = assigned or global_ipv6(iface)
     pcs, gw = wds_pcscf(mux_id) if mux_id is not None else ([], None)
     if not (src and pcs and gw):
         print("MISSING", bool(src), bool(pcs), bool(gw))
@@ -1063,7 +1167,15 @@ def main() -> int:
             print("TPT_NEEDS_TCP_OVER_XFRM", len(msg2), _crit, _plmn)
     src_b = socket.inet_pton(socket.AF_INET6, src)
     dst_b = socket.inet_pton(socket.AF_INET6, target)
-    sa = EspSa(src, target, src_b, dst_b, port_c, pcscf_sec.port_s, pcscf_sec.spi_s, ck, ik)
+    sa = None
+    if os.environ.get("JOAN_IMS_NO_BRIDGE") != "1" and mode == "register":
+        try:
+            ue_sec = ipsec.SecAgree(pcscf_sec.alg, pcscf_sec.ealg, spi_c, spi_s, port_c, port_s)
+            sa = KernelSa(src, target, ue_sec, pcscf_sec, ck, ik)
+        except (OSError, subprocess.CalledProcessError) as e:
+            print("KERNEL_ESP_FAIL", type(e).__name__)
+    if sa is None:
+        sa = EspSa(src, target, src_b, dst_b, port_c, pcscf_sec.port_s, pcscf_sec.spi_s, ck, ik)
     sa.send(msg2)
     try:
         t2, h2 = sa.recv(12)

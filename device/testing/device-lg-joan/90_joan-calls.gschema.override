@@ -1,0 +1,4 @@
+# Load the SIP backend first: joan-imsd bridges it to carrier VoLTE. The modem
+# line stays available for networks with circuit-switched voice.
+[org.gnome.Calls]
+autoload-plugins=[\x27sip\x27, \x27mm\x27]

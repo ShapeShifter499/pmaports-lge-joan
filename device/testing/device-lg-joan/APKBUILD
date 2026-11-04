@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lg-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=35
+pkgrel=36
 url="https://postmarketos.org"
 license="MIT"
 provides="device-lge-joan=$pkgver-r$pkgrel"
@@ -19,6 +19,7 @@ depends="
 	firmware-qcom-adreno-a530
 	fm-radio
 	gnome-sound-recorder
+	libsecret
 	joan-adsp-watchdog
 	lg-joan-volte
 	lg-joan-cellular-data
@@ -57,6 +58,9 @@ source="deviceinfo
 	registry.conf
 	91-joan-usb-runtime-pm.rules
 	joan-hw-video.js
+	joan-volte-account
+	joan-volte-account.service
+	90_joan-calls.gschema.override
 	30-lg-joan.conf
 	
 	"
@@ -84,6 +88,17 @@ package() {
 	# (quiet, splash) rather than replacing them
 	install -Dm644 "$srcdir"/30-lg-joan.conf \
 		"$pkgdir"/usr/lib/kernel-cmdline.d/30-lg-joan.conf
+
+	# First login: the VoLTE account in Calls, and Calls prefers that line
+	install -Dm644 "$srcdir"/90_joan-calls.gschema.override \
+		"$pkgdir"/usr/share/glib-2.0/schemas/90_joan-calls.gschema.override
+	install -Dm755 "$srcdir"/joan-volte-account \
+		"$pkgdir"/usr/libexec/joan-volte-account
+	install -Dm644 "$srcdir"/joan-volte-account.service \
+		"$pkgdir"/usr/lib/systemd/user/joan-volte-account.service
+	mkdir -p "$pkgdir"/etc/systemd/user/graphical-session.target.wants
+	ln -s /usr/lib/systemd/user/joan-volte-account.service \
+		"$pkgdir"/etc/systemd/user/graphical-session.target.wants/joan-volte-account.service
 
 	# Venus hardware video decode in Firefox
 	install -Dm644 "$srcdir"/joan-hw-video.js \
@@ -165,5 +180,8 @@ f3d67518766e4028c92c649cc1d8abf43d756ede69e22ebfa41a5342987ac2c67dadc18baa9169e7
 ce6443994f4585d77b0f4107e0d3d01957f137a194c48f249859872bf10b80a2317db3f7085ca42092e3f9013c75617e45aeb4f3f8fea2d48f50d7525df1326a  registry.conf
 2b4fb4dfea81da566dd084ef2cf75b109040226b0e04d959b3798111a1803b96ac97f32322d552aecb47fa6ac22f9e4861785ed8fa2cf9ee2a2a82d8287d5946  91-joan-usb-runtime-pm.rules
 2548dc80b02b529535bab26a7f55dc880dab0d24fa33dfc03d26ed1723e5d2ba9d4daef91890bd6c213e5253d27c46ccc1ddb75f0fe104d7b37dc5f3650b07f9  joan-hw-video.js
+471fc2d1e38243efc0350bcba61a215c75c06dd909e200afda2ba7bfcb114857ef1b469fdc871f52316fd6a51f76ba60d2b73a7c5c8cc07f8e511ab50098be38  joan-volte-account
+731806d505ef05d9101ed65440683656dfe660021bae0ecdafa909029560878ddfdffa6ebae16d139fe75199cc4b932389a7a3ec4938553b023a77fb41a3ce12  joan-volte-account.service
+30c87740ea5fe2c69e4de77aa62339113588ec5c5a1bdd45e958116c163ce0ff84053d62b929f7380e29e9b6e0d2351d9234dee9e4d519f215aee6973b09d939  90_joan-calls.gschema.override
 13b832488bbe273b7f28fe24b42b3e987985ca5f586ebd6ce09675dbcc54344f277cac059b3c7ee04fc8ead4a81c9d564b04115f655e1f0ccdaf9762cb243232  30-lg-joan.conf
 "

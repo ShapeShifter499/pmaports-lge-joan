@@ -1,0 +1,25 @@
+#!/bin/sh
+# Give GNOME Calls its account for joan-imsd's local SIP bridge, once per user.
+# The call itself is carrier VoLTE; the password only guards a loopback socket.
+cfg="${XDG_CONFIG_HOME:-$HOME/.config}/calls/sip-account.cfg"
+[ -e "$cfg" ] && exit 0
+
+printf volte | secret-tool store --label="Calls Password for VoLTE" \
+	xdg:schema sm.puri.Calls server 127.0.0.1 username volte protocol sip || exit 1
+
+mkdir -p "$(dirname "$cfg")"
+cat > "$cfg" <<CFG
+[sip-00]
+Id=joan-volte
+Host=127.0.0.1
+Proxy=
+User=volte
+DisplayName=VoLTE
+Protocol=UDP
+Port=5070
+AutoConnect=true
+DirectMode=false
+LocalPort=0
+CanTel=true
+MediaEncryption=0
+CFG

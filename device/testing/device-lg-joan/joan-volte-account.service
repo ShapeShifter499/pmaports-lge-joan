@@ -1,0 +1,10 @@
+[Unit]
+Description=Set up the VoLTE account in GNOME Calls
+Before=calls-daemon.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/joan-volte-account
+
+[Install]
+WantedBy=graphical-session.target

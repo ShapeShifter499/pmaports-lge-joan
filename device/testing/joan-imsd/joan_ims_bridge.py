@@ -450,6 +450,7 @@ class Bridge:
 
     def on_ims_invite(self, text, hdrs):
         tag = uuid.uuid4().hex[:10]
+        print("IN_INVITE", "require:", hdr(hdrs, "require"), "supported:", hdr(hdrs, "supported"))
         if self.call or not self.calls_addr:
             reason = "Busy Here" if self.call else "Temporarily Unavailable"
             self.ims.send(self.ims.response(text, 486 if self.call else 480, reason, tag))
@@ -483,6 +484,11 @@ class Bridge:
         self.relay.calls_peer = (LOCAL_IP, calls_rtp[1])
         self.relay.ims_peer = (ims_rtp[0], ims_rtp[1])
         self.relay.start()
+        if self.speaker:
+            # The Voice Call source comes up muted.
+            subprocess.Popen(self.speaker.user_cmd("pactl", "set-source-mute",
+                                                   "@DEFAULT_SOURCE@", "0"),
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print("RTP_RELAY_UP")
 
     def end_call(self):
