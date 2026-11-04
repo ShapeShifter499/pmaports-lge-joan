@@ -1,0 +1,8 @@
+# Let the USB controller runtime-suspend once nothing is attached.
+#
+# dwc3 forbids runtime PM by default, so without this the controller stays
+# powered after an unplug and its 2.5 GB/s interconnect vote holds DDR at the
+# 412 MHz step for as long as the phone is on battery. Measured on joan: after
+# a detach the vote drops to 0 about 5 s later (the autosuspend delay), and a
+# replug is back to "configured" within a second.
+ACTION!="remove", SUBSYSTEM=="platform", KERNEL=="a800000.usb", ATTR{power/control}="auto"

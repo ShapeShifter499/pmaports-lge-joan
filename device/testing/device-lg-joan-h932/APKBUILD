@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lg-joan-h932
 pkgdesc="LG V30, T-Mobile H932 only (differently signed firmware)"
 pkgver=1
-pkgrel=14
+pkgrel=15
 url="https://postmarketos.org"
 license="MIT"
 provides="device-lge-joan-h932=$pkgver-r$pkgrel"
@@ -33,6 +33,7 @@ depends="
 "
 makedepends="devicepkg-dev"
 source="deviceinfo
+	30-lg-joan.conf
 	50-joan-echo-cancel.conf
 	53-joan-driver-priority.conf
 	54-joan-no-mmap.conf
@@ -51,6 +52,10 @@ package() {
 
 	# Default apps (see depends): voice recorder, volume panel, and neard
 	# for the PN547 NFC controller, enabled by this preset.
+	# Kernel options, added to postmarketOS own quiet and splash
+	install -Dm644 "$srcdir"/30-lg-joan.conf \
+		"$pkgdir"/usr/lib/kernel-cmdline.d/30-lg-joan.conf
+
 	install -Dm644 "$srcdir"/90-lg-joan.preset \
 		"$pkgdir"/usr/lib/systemd/system-preset/90-lg-joan.preset
 
@@ -79,7 +84,8 @@ package() {
 }
 
 sha512sums="
-4ad011352a477a997e68e94de655241ef7250f58883b2621d09df71ebaf8ee320dcb0bcc144ac56f79a199276476b644537da220d9ecad9328e49aa8961087ff  deviceinfo
+66ba30f5a47dd92da026f29ecdd20c9ffbcdfb1d73c9f221548917de74969027d1a6c39b4a72e88d022bf5c993ddca0c25cf0f27c082381bc97f48fc10070330  deviceinfo
+13b832488bbe273b7f28fe24b42b3e987985ca5f586ebd6ce09675dbcc54344f277cac059b3c7ee04fc8ead4a81c9d564b04115f655e1f0ccdaf9762cb243232  30-lg-joan.conf
 e541a5c9127ef86c9ebde27744c2f483004ba54731ad31f2326550b81105a727a46855c2f4faeb94a6bea3c7cb2bd551264fa8c787417311dab1ef9e620c4d1a  50-joan-echo-cancel.conf
 7074b0d87f54fa9c90383bca028f761a543f9c13d976b4c9096482ca98184fc5e82e922db8e339dc95d34d46c02f43dd726d9f8348ccbd801b13dfcf60b95bbe  53-joan-driver-priority.conf
 6502a1ee494f223c3184f832ce0aa6d7d88ce5cf5294def54361dc4798fd7664f90785df380d3c975a5215178f23d6aabbae3a1bbf115bcd3441190b47cd2dcc  54-joan-no-mmap.conf

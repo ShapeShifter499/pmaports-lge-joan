@@ -31,7 +31,6 @@ deviceinfo_flash_pagesize="4096"
 deviceinfo_initfs_compression="zstd:best"
 
 # Mainline kernel options
-deviceinfo_kernel_cmdline="panic=5 pmos.force-partition-resize ipa.lowmem=1"
 deviceinfo_dtb="qcom/msm8998-lg-joan"
 deviceinfo_append_dtb="true"
 

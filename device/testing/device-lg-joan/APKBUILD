@@ -3,7 +3,7 @@ maintainer="Lance <Gero3977@gmail.com>"
 pkgname=device-lg-joan
 pkgdesc="LG V30 (H930, US998, H932PR and other non-H932)"
 pkgver=1
-pkgrel=32
+pkgrel=34
 url="https://postmarketos.org"
 license="MIT"
 provides="device-lge-joan=$pkgver-r$pkgrel"
@@ -54,6 +54,9 @@ source="deviceinfo
 	org.neard.service
 	megapixels-lg-joan.conf
 	registry.conf
+	91-joan-usb-runtime-pm.rules
+	joan-hw-video.js
+	30-lg-joan.conf
 	
 	"
 
@@ -71,6 +74,19 @@ package() {
 	# BFQ for the microSD the SD-flavour rootfs lives on
 	install -Dm644 "$srcdir"/90-joan-bfq.rules \
 		"$pkgdir"/usr/lib/udev/rules.d/90-joan-bfq.rules
+
+	# Let the USB controller suspend, and release DDR, after an unplug
+	install -Dm644 "$srcdir"/91-joan-usb-runtime-pm.rules \
+		"$pkgdir"/usr/lib/udev/rules.d/91-joan-usb-runtime-pm.rules
+
+	# Kernel options for this device, added to postmarketOS's own
+	# (quiet, splash) rather than replacing them
+	install -Dm644 "$srcdir"/30-lg-joan.conf \
+		"$pkgdir"/usr/lib/kernel-cmdline.d/30-lg-joan.conf
+
+	# Venus hardware video decode in Firefox
+	install -Dm644 "$srcdir"/joan-hw-video.js \
+		"$pkgdir"/usr/lib/firefox/defaults/pref/joan-hw-video.js
 
 	# Keep GStreamer away from the Venus H.264 encoder until its EOS fix
 	# lands (see the file header; the SoC resets when the firmware asserts).
@@ -119,7 +135,7 @@ package() {
 }
 
 sha512sums="
-79a22a09ae518e3c38fe51b7abb608663ed312f9739a3615738243103ad95cba73585c44bcb5795eeb71e2d8ef1d206e4c0f6d6afa828203833682576500af4e  deviceinfo
+88cbe98435ecb3abc977f64f8dea9607c7249717e9c4eca0e3346343996ccb94dac1b3950b3a1537c01f5c4169ff7a0f2b7e51876c4624de13b7ba183120a9f3  deviceinfo
 7074b0d87f54fa9c90383bca028f761a543f9c13d976b4c9096482ca98184fc5e82e922db8e339dc95d34d46c02f43dd726d9f8348ccbd801b13dfcf60b95bbe  53-joan-driver-priority.conf
 6502a1ee494f223c3184f832ce0aa6d7d88ce5cf5294def54361dc4798fd7664f90785df380d3c975a5215178f23d6aabbae3a1bbf115bcd3441190b47cd2dcc  54-joan-no-mmap.conf
 a890f1f3d32a67465158c82eeee7acb071573b31e08a33c46893df78f2b169eb7a9425981d71bc4ff8733f2c88e4ad6a390bb6346bdef3a8c97d8824cf4df25a  55-joan-camera-names.conf
@@ -135,4 +151,7 @@ f3d67518766e4028c92c649cc1d8abf43d756ede69e22ebfa41a5342987ac2c67dadc18baa9169e7
 7b2632a017b291a84c15694a52afc56c57cb5d79ad48bd217078ff75b35904abad0dba4c3e5ff258adad125a7cd2619033782ec14e52572f85568377764b4dea  org.neard.service
 45505733dfdb5bbd70e2d002567facb7692f10e234ea526f2e1402a1bb6667bb018cf71eef5d3908f37e828523a7644ea6cf63085f70f7ca8dfec99a9a51d094  megapixels-lg-joan.conf
 ce6443994f4585d77b0f4107e0d3d01957f137a194c48f249859872bf10b80a2317db3f7085ca42092e3f9013c75617e45aeb4f3f8fea2d48f50d7525df1326a  registry.conf
+2b4fb4dfea81da566dd084ef2cf75b109040226b0e04d959b3798111a1803b96ac97f32322d552aecb47fa6ac22f9e4861785ed8fa2cf9ee2a2a82d8287d5946  91-joan-usb-runtime-pm.rules
+2548dc80b02b529535bab26a7f55dc880dab0d24fa33dfc03d26ed1723e5d2ba9d4daef91890bd6c213e5253d27c46ccc1ddb75f0fe104d7b37dc5f3650b07f9  joan-hw-video.js
+13b832488bbe273b7f28fe24b42b3e987985ca5f586ebd6ce09675dbcc54344f277cac059b3c7ee04fc8ead4a81c9d564b04115f655e1f0ccdaf9762cb243232  30-lg-joan.conf
 "
