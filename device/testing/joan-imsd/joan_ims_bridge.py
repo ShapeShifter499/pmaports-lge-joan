@@ -8,8 +8,11 @@ them untouched. It knows nothing about AKA or IPsec: it only needs the small
 
 One call at a time, which is also all GNOME Calls allows on an account.
 """
+import os
+import pwd
 import select
 import socket
+import subprocess
 import threading
 import time
 import uuid
@@ -66,6 +69,31 @@ def local_sdp():
         "a=rtpmap:0 PCMU/8000\r\n"
         "a=sendrecv\r\n"
     )
+
+
+def session_user():
+    """(name, uid) of the logged-in user, skipping the greeter's session."""
+    for entry in sorted(os.listdir("/run/user")):
+        if entry.isdigit() and int(entry) >= 1000:
+            return pwd.getpwuid(int(entry)).pw_name, int(entry)
+    return None, None
+
+
+def set_call_audio(active):
+    """Ask callaudiod for call mode, as Calls does for cellular calls only.
+
+    libcall-ui treats a SIP call as VoIP and leaves the audio in media mode on
+    the speaker, but on this bridge it is a real phone call.
+    """
+    name, uid = session_user()
+    if not name:
+        return
+    subprocess.Popen(
+        ["sudo", "-u", name, "env", f"XDG_RUNTIME_DIR=/run/user/{uid}",
+         f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus",
+         "callaudiocli", "-m", "1" if active else "0"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print("CALL_AUDIO", "on" if active else "off")
 
 
 def number_from_uri(uri):
@@ -133,6 +161,7 @@ class Bridge:
         self.probe_branch = "z9hG4bK" + uuid.uuid4().hex[:12]
         self.relay = None
         self.call = None
+        self.call_audio = False
 
     # ---- local (GNOME Calls) side -------------------------------------
     def local_response(self, hdrs, code, reason, addr, body="", to_tag=None):
@@ -258,6 +287,9 @@ class Bridge:
         }
         self.ims.send(inv)
         print("OUT_INVITE_SENT")
+        # Before Calls opens its audio: the switch replaces the sinks.
+        self.call_audio = True
+        set_call_audio(True)
 
     def on_local_response(self, first, hdrs, body):
         call = self.call
@@ -413,6 +445,9 @@ class Bridge:
             self.relay.stop()
             self.relay.join(timeout=1)  # frees the RTP ports for the next call
             self.relay = None
+        if self.call_audio:
+            self.call_audio = False
+            set_call_audio(False)
         self.call = None
         print("CALL_ENDED")
 
