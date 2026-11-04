@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=joan-imsd
 pkgver=0.1
-pkgrel=8
+pkgrel=9
 pkgdesc="3GPP IMS SIP UA for LG V30 (joan) VoLTE — AP-side, no vendor blobs"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -16,6 +16,7 @@ source="
 	joan-imsd.service
 	joan-ims.desktop
 	joan_ims_live.py
+	joan_ims_bridge.py
 	joan_ims_profiles.py
 	joan_ims_esp.py
 	joan_ims_ipsec.py
@@ -35,7 +36,7 @@ package() {
 		"$pkgdir/usr/share/joan-imsd/profiles" \
 		"$pkgdir/etc/joan-imsd" \
 		"$pkgdir/var/lib/joan-imsd"
-	for f in joan_ims_live.py joan_ims_profiles.py joan_ims_esp.py \
+	for f in joan_ims_live.py joan_ims_bridge.py joan_ims_profiles.py joan_ims_esp.py \
 		joan_ims_ipsec.py joan_ims_pco.py joan_ims_register.py \
 		joan_ims_ua.py; do
 		install -Dm644 "$srcdir/$f" "$pkgdir/usr/lib/joan-imsd/$f"
@@ -65,7 +66,8 @@ be3ef7043a777d1b58283a957effabb951d6059f04f6dde1ef397b94856ee03fbdad42a78621aa3c
 c3eef9cd3224d58815dc3f7372f93caddebb554857d8c8841f09bb5d777e127acf91c9f6570e39c17a8a05aad5ec666a16fe5c6e69fd5871926ee44bc7e62162  joan-imsd.initd
 9331f0f5fd914998a97a55c665ad5cb582fbd49e0560e78c1950bba097271fa09d176d75de4faf95a644dc0e7d0d7ea2e862f5cd367f1027c80d9a7fb7c6aa88  joan-imsd.service
 406962def62a9f5a16f23d475d1b926ebd0ca7a61b5e6dfe5e3f9aee355d8070e15fbe034217969bedd4b8a5ff49e53bd61e7e1e9348083dbe4baedfbe4f2073  joan-ims.desktop
-1c1bcb53c0dfc5518552a6e79e25b450c95711478003e7d40855e4459240df0814d9cc78e382a264aa6085383f6930a0c70388824c1515e912b60b0d87c77274  joan_ims_live.py
+e16f8c3c2ae95de17a5569324971b74e314e2c322ae1846c1ee2c5412a1cbd237a625a40352407e84091def1e3e0518fd52cac970843f43375d95d2916a83e20  joan_ims_live.py
+f964bc0bbba260b5438832d16585816c5f6a109e25624e2ed4cd002978148201e98ff69026ce29fad82a73455223002012bf38c70105e61b56f0fea7cbe4c68d  joan_ims_bridge.py
 3de09a7adf2857a6bda95a2fa7d2560444f1cefa33d9f93023191689a50abae3492d2dffff152496548880e635cf5679c4424c557dae254023e78bda62d39fa3  joan_ims_profiles.py
 33a6b74d7f2b9177336c6b5cbcab3a26c248370ee9e569748a8d7fddfe6512de795cc0599c791823b87990345b0b489f624533b2fffed205397e168848959c99  joan_ims_esp.py
 1c1864cf14db6782c5e749314088808d6fe56244474012c3759bfa374ec8475cb2072aa36a8d52e57d60da60090cfbeb3a76c83dcd3977a031b7ee37497672e1  joan_ims_ipsec.py

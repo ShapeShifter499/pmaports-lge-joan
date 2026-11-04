@@ -653,7 +653,8 @@ def aor_from_impu(impu: str) -> str:
     return f"sip:{impu}"
 
 
-def build_invite(*, aor, realm, src, port_c, pcscf_port_s, routes, ss, dest=None) -> bytes:
+def build_invite(*, aor, realm, src, port_c, pcscf_port_s, routes, ss, dest=None,
+                 pcmu_only=False) -> bytes:
     dest = dest or DEST
     tag = uuid.uuid4().hex[:12]
     call_id = str(uuid.uuid4())
@@ -677,6 +678,20 @@ def build_invite(*, aor, realm, src, port_c, pcscf_port_s, routes, ss, dest=None
         "a=maxptime:240\r\n"
         "a=sendrecv\r\n"
     )
+    if pcmu_only:
+        sdp = (
+            "v=0\r\n"
+            f"o=- {int(time.time())} 1 IN IP6 {src}\r\n"
+            "s=-\r\n"
+            f"c=IN IP6 {src}\r\n"
+            "t=0 0\r\n"
+            "m=audio 40000 RTP/AVP 0 101\r\n"
+            "a=rtpmap:0 PCMU/8000\r\n"
+            "a=rtpmap:101 telephone-event/8000\r\n"
+            "a=fmtp:101 0-15\r\n"
+            "a=ptime:20\r\n"
+            "a=sendrecv\r\n"
+        )
     lines = [
         f"INVITE {dest} SIP/2.0",
         f"Via: SIP/2.0/UDP {host}:{port_c};branch={branch};rport",
@@ -782,6 +797,78 @@ def build_bye(*, dest, aor, src, port_c, routes, from_tag, to_tag, call_id, ss) 
     return "\r\n".join(lines).encode()
 
 
+class ImsSession:
+    """What joan_ims_bridge needs from a registered IMS session."""
+
+    def __init__(self, sa, *, aor, realm, src, port_c, pcscf_port_s, routes, ss, iface):
+        self.sa = sa
+        self.aor = aor
+        self.realm = realm
+        self.src = src
+        self.port_c = port_c
+        self.pcscf_port_s = pcscf_port_s
+        self.routes = routes
+        self.ss = ss
+        self.iface = iface
+
+    def send(self, data):
+        return self.sa.send(data)
+
+    def recv(self, timeout):
+        return self.sa.recv(timeout)
+
+    def build_invite(self, dest):
+        return build_invite(aor=self.aor, realm=self.realm, src=self.src, port_c=self.port_c,
+                            pcscf_port_s=self.pcscf_port_s, routes=self.routes, ss=self.ss,
+                            dest=dest, pcmu_only=True)
+
+    def build_prack(self, **kw):
+        return build_prack(aor=self.aor, src=self.src, port_c=self.port_c,
+                           routes=self.routes, ss=self.ss, **kw)
+
+    def build_ack(self, **kw):
+        return build_ack(aor=self.aor, src=self.src, port_c=self.port_c,
+                         routes=self.routes, ss=self.ss, **kw)
+
+    def build_bye(self, routes=None, **kw):
+        return build_bye(aor=self.aor, src=self.src, port_c=self.port_c,
+                         routes=routes if routes is not None else self.routes,
+                         ss=self.ss, **kw)
+
+    def build_cancel(self, invite: bytes) -> bytes:
+        """CANCEL matching an INVITE: same Via, Route, From, To, Call-ID, CSeq number."""
+        head = invite.decode("utf-8", "replace").split("\r\n\r\n", 1)[0].split("\r\n")
+        uri = head[0].split()[1]
+        keep = [l for l in head[1:] if l.lower().startswith(
+            ("via:", "route:", "from:", "to:", "call-id:", "max-forwards:"))]
+        return "\r\n".join(
+            [f"CANCEL {uri} SIP/2.0"] + keep + [
+                "CSeq: 1 CANCEL",
+                "Require: sec-agree",
+                "Proxy-Require: sec-agree",
+                f"Security-Verify: {self.ss}",
+                "Content-Length: 0", "", "",
+            ]).encode()
+
+    def sdp(self) -> str:
+        return (
+            "v=0\r\n"
+            f"o=- {int(time.time())} 1 IN IP6 {self.src}\r\n"
+            "s=-\r\n"
+            f"c=IN IP6 {self.src}\r\n"
+            "t=0 0\r\n"
+            "m=audio 40000 RTP/AVP 0 101\r\n"
+            "a=rtpmap:0 PCMU/8000\r\n"
+            "a=rtpmap:101 telephone-event/8000\r\n"
+            "a=sendrecv\r\n"
+        )
+
+    def response(self, req, code, reason, tag, body=""):
+        extra = ["Content-Type: application/sdp"] if body else None
+        return sip_response(req, code, reason, to_tag=tag, src=self.src, port_c=self.port_c,
+                            body=body, extra=extra)
+
+
 def main() -> int:
     global DEST
     argv = sys.argv[1:]
@@ -859,7 +946,10 @@ def main() -> int:
         print("NO_DEST")
         return 2
     aor = aor_from_impu(impu or impi)
-    spi_c, spi_s = 0x11110001, 0x11110002
+    # Fresh SPIs per registration: reusing them after a quick restart collides
+    # with the security association the P-CSCF still holds.
+    spi_c = int.from_bytes(os.urandom(4), "big") | 0x10000000
+    spi_s = spi_c ^ 1
     port_c, port_s = 15000, 16000
 
     # Drop leftover binding from prior 200 OK (Expires was 600000s).
@@ -996,6 +1086,13 @@ def main() -> int:
     print("VSS", vss_set_ims_registered())
     print("REGISTERED")
     if os.environ.get("JOAN_IMS_MODE", mode) == "register":
+        if os.environ.get("JOAN_IMS_NO_BRIDGE") != "1":
+            import joan_ims_bridge
+            session = ImsSession(sa, aor=aor, realm=realm, src=src, port_c=port_c,
+                                 pcscf_port_s=pcscf_sec.port_s, routes=routes, ss=ss,
+                                 iface=iface)
+            joan_ims_bridge.Bridge(session).run()
+            return 0
         return listen_incoming(sa, src=src, port_c=port_c, iface=iface)
 
     inv, inv_tag, inv_cid = build_invite(
@@ -1073,7 +1170,7 @@ def main() -> int:
             print("INCALL", line0)
             if line0.startswith("BYE "):
                 hangup = True
-                # 200 OK for their BYE
+                sa.send(sip_response(t, 200, "OK", to_tag=to_tag, src=src, port_c=port_c))
                 print("REMOTE_BYE")
         stop.set()
         if rtp_thr:
