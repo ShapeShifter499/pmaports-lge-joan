@@ -3,15 +3,16 @@ Description=LG V30 IMS registration (VoLTE SIP UA)
 Wants=ModemManager.service 81voltd.service
 After=ModemManager.service 81voltd.service
 ConditionPathExists=/usr/bin/joan-ims
-# Stay inert until an operator identity exists: the live flow exits with
-# code 2/3 without one, and retrying is just churn on alpha images.
-ConditionPathExists=/etc/joan-imsd/isim.env
-# Bound the retry storm when the modem is down but identity exists.
+# Identity comes from the SIM. Without one the flow exits with code 2/3, so
+# bound the retries.
 StartLimitIntervalSec=600
 StartLimitBurst=3
 
 [Service]
 Type=simple
+# ModemManager takes a while to find the modem after boot.
+ExecStartPre=/bin/sh -c 'until mmcli -m any >/dev/null 2>&1; do sleep 5; done'
+TimeoutStartSec=180
 ExecStart=/usr/bin/joan-ims register
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONPATH=/usr/lib/joan-imsd

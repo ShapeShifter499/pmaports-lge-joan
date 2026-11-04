@@ -179,6 +179,17 @@ def ensure_ims_bearer() -> tuple[str | None, str | None]:
     return find_ims_bearer()
 
 
+def apply_bearer_ipv6(path: str, iface: str) -> None:
+    """Nothing else configures the IMS bearer, so apply what the modem gave it."""
+    b = mm_kv("-b", path)
+    addr = b.get("bearer.ipv6-config.address", "--")
+    prefix = b.get("bearer.ipv6-config.prefix", "--")
+    if addr == "--" or prefix == "--":
+        return
+    sudo(["ip", "link", "set", iface, "up"])
+    sudo(["ip", "-6", "addr", "replace", f"{addr}/{prefix}", "dev", iface])
+
+
 def wds_pcscf(mux_id: int):
     servers = qrtr_lookup(QMI_SERVICE_WDS)
     if not servers:
@@ -787,10 +798,11 @@ def main() -> int:
         elif argv[0].startswith("+") or argv[0].startswith("sip:"):
             mode = "dial"
             number = argv[0]
-    _bearer, iface = ensure_ims_bearer()
+    bearer, iface = ensure_ims_bearer()
     if not iface:
         print("NO_IMS_BEARER")
         return 2
+    apply_bearer_ipv6(bearer, iface)
     mux_id = iface_mux_id(iface)
     src = global_ipv6(iface)
     pcs, gw = wds_pcscf(mux_id) if mux_id is not None else ([], None)
