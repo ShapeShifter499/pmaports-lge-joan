@@ -1,0 +1,5 @@
+# Phosh dims to this share of its logarithmic brightness range. The default of
+# 30 is raw 9 of 255 on this OLED panel, which is nearly black, and the login
+# screen hands that dimmed level on to the session. 60 is raw 37.
+[org.gnome.settings-daemon.plugins.power]
+idle-brightness=60
