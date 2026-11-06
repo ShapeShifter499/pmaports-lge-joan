@@ -9,8 +9,8 @@ _flavor="lg-joan"
 _dtb="qcom/msm8998-lg-joan"   # must match deviceinfo_dtb
 pkgname=linux-$_flavor
 pkgver=7.3.0_rc6
-pkgrel=24
-_commit=b81e29658fd7dc6dcbeb3fec6fc9e05c3a0755cc
+pkgrel=29
+_commit=7c1fbdb6300213bdc4fac5feb0fbe52b28ff0336
 pkgdesc="Mainline kernel for the LG V30 (joan)"
 arch="aarch64"
 _carch="arm64"
@@ -96,6 +96,6 @@ package() {
 }
 
 sha512sums="
-4f143db0c5431705d76acda98dd97b2628a2ae90d48222a7fa5ec42aa7b32397366a01892dafb19c634ee237b52399f7e80fc2534deb2b8ad240a781d1aa589c  linux-lg-joan-b81e29658fd7dc6dcbeb3fec6fc9e05c3a0755cc.tar.gz
+c83b266e8deb00377b3060b3dbaa5bafd6fa21beea9f98dae05d5c73dabbf138b50836c3757bcfd31f99fc0c0263d03c53bb9a93399855265d5052f3de775481  linux-lg-joan-7c1fbdb6300213bdc4fac5feb0fbe52b28ff0336.tar.gz
 e6c1968ec8fd7719d74ecce7134d794d45bd83681020fd3558630b1ba6f9b7611c67c3a75c46ff8c6cdebc0bea4146dc292183ce7db3d5275b08d816a9896b9d  config-lg-joan.aarch64
 "
