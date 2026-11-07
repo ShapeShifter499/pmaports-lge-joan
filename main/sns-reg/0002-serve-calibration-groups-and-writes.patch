@@ -1,0 +1,570 @@
+From: Lance <Gero3977@gmail.com>
+Subject: [PATCH] Serve the calibration groups and answer group writes
+
+On the LG V30 the sensor DSP reads five groups that were not in the map,
+2500, 2610, 2970, 2980 and 2990, and gets a failure for each. It also
+sends group writes (message 0x05) that were dropped without a reply.
+Group 2500 holds the gyro calibration settings and 2970 the magnetometer
+calibration settings, so the DSP's fused outputs ran uncalibrated.
+
+Add those groups and the written groups 2691 and 3050, with layouts
+taken from the item and group tables in LG's sensors.qti. The tables
+were checked against this map (64 of 68 groups identical, sizes all
+equal) and against the phone's own sns.reg, whose size matches exactly.
+
+Answer group writes and keep the values for the current boot. Log
+messages that are still unhandled, and line-buffer stdout so the journal
+does not lose requests.
+
+Signed-off-by: Lance <Gero3977@gmail.com>
+Assisted-by: Claude-Code:claude-opus-5-5
+---
+--- a/main.c
++++ b/main.c
+@@ -129,6 +129,79 @@
+ 	return ret;
+ }
+ 
++int handle_group_write(int sock, struct qrtr_packet *packet, unsigned long *registry)
++{
++	unsigned int txn_id;
++	struct sns_reg_group_write_req request = { };
++	struct sns_reg_group_write_resp response = { };
++	const struct group *group = NULL;
++	size_t index = 0;
++	size_t size = 0;
++	struct key key;
++	struct qrtr_packet out_packet;
++	int ret;
++
++	ret = qmi_decode_message(
++				&request,
++				&txn_id,
++				packet,
++				QMI_REQUEST,
++				SNS_REG_GROUP_WRITE_MSG_ID,
++				sns_reg_group_write_req_ei
++			);
++	if (ret < 0) {
++		fprintf(stderr, "Failed to decode write request\n");
++		return ret;
++	}
++
++	group = group_by_id(request.id);
++
++	printf("Write to group %04d, %d bytes%s\n", request.id, request.data_len,
++	       !group ? " unmapped!" : "");
++
++	if (!group) {
++		response.result = QMI_RESULT_FAILURE_V01;
++	} else {
++		response.result = QMI_RESULT_SUCCESS_V01;
++
++		/* Values are kept for this boot only */
++		while ((key = group->keys[index++]).len &&
++		       size + key.len <= request.data_len) {
++			if (key.id != -1) {
++				registry[key.id] = 0;
++				memcpy(&registry[key.id], request.data + size, key.len);
++			}
++
++			size += key.len;
++		}
++	}
++
++	out_packet.data = malloc(BUFFER_LEN);
++	out_packet.data_len = BUFFER_LEN;
++
++	ret = qmi_encode_message(
++		&out_packet,
++		QMI_RESPONSE,
++		SNS_REG_GROUP_WRITE_MSG_ID,
++		txn_id,
++		&response,
++		sns_reg_group_write_resp_ei
++	);
++	if (ret < 0) {
++		fprintf(stderr, "Failed to encode write response: %d\n", ret);
++		goto out;
++	}
++
++	ret = qrtr_sendto(sock, packet->node, packet->port, out_packet.data, out_packet.data_len);
++	if (ret)
++		fprintf(stderr, "Failed to send write response: %d\n", ret);
++
++out:
++	free(out_packet.data);
++
++	return ret;
++}
++
+ int main(int argc, const char **argv)
+ {
+ 	int fd;
+@@ -143,6 +216,9 @@
+ 	struct sns_reg_group_req request;
+ 	int ret;
+ 
++	/* Logs go to the journal, so do not sit in a block buffer */
++	setvbuf(stdout, NULL, _IOLBF, 0);
++
+ 	fd = open("/etc/sns-reg.d/registry.conf", O_RDONLY);
+ 	if (fd < 0) {
+ 		fprintf(stderr, "Failed to open registry: %s\n", strerror(errno));
+@@ -198,6 +274,10 @@
+ 
+ 		if (header->msg_id == SNS_REG_GROUP_MSG_ID)
+ 			handle_group_request(sock, &packet, registry);
++		else if (header->msg_id == SNS_REG_GROUP_WRITE_MSG_ID)
++			handle_group_write(sock, &packet, registry);
++		else
++			printf("Unhandled message 0x%x\n", header->msg_id);
+ 	}
+ 
+ 	return 0;
+--- a/map.c
++++ b/map.c
+@@ -1864,6 +1864,351 @@
+ 			{ /* sentinel */ }
+ 		},
+ 	},
++	{ 2500,
++		{
++			{ 502, 8 },
++			{ 500, 4 },
++			{ 501, 4 },
++			{ 503, 1 },
++			{ 504, 4 },
++			{ /* sentinel */ }
++		},
++	},
++	{ 2610,
++		{
++			{ 306, 4 },
++			{ 307, 4 },
++			{ 308, 4 },
++			{ 309, 4 },
++			{ 310, 4 },
++			{ 311, 4 },
++			{ /* sentinel */ }
++		},
++	},
++	{ 2691,
++		{
++			{ 3600, 1 },
++			{ 3601, 1 },
++			{ -1, 14 },
++			{ 3602, 8 },
++			{ 3603, 8 },
++			{ 3604, 4 },
++			{ 3605, 4 },
++			{ 3606, 2 },
++			{ 3607, 2 },
++			{ 3608, 2 },
++			{ 3609, 2 },
++			{ 3610, 2 },
++			{ 3611, 1 },
++			{ 3612, 1 },
++			{ 3613, 1 },
++			{ 3614, 1 },
++			{ 3615, 1 },
++			{ 3616, 1 },
++			{ 3617, 1 },
++			{ 3682, 1 },
++			{ 3687, 1 },
++			{ 3688, 1 },
++			{ -1, 4 },
++			{ 3618, 8 },
++			{ 3619, 8 },
++			{ 3620, 4 },
++			{ 3621, 4 },
++			{ 3622, 2 },
++			{ 3623, 2 },
++			{ 3624, 2 },
++			{ 3625, 2 },
++			{ 3626, 2 },
++			{ 3627, 1 },
++			{ 3628, 1 },
++			{ 3629, 1 },
++			{ 3630, 1 },
++			{ 3631, 1 },
++			{ 3632, 1 },
++			{ 3633, 1 },
++			{ 3683, 1 },
++			{ 3689, 1 },
++			{ 3690, 1 },
++			{ -1, 4 },
++			{ 3634, 8 },
++			{ 3635, 8 },
++			{ 3636, 4 },
++			{ 3637, 4 },
++			{ 3638, 2 },
++			{ 3639, 2 },
++			{ 3640, 2 },
++			{ 3641, 2 },
++			{ 3642, 2 },
++			{ 3643, 1 },
++			{ 3644, 1 },
++			{ 3645, 1 },
++			{ 3646, 1 },
++			{ 3647, 1 },
++			{ 3648, 1 },
++			{ 3649, 1 },
++			{ 3684, 1 },
++			{ 3691, 1 },
++			{ 3692, 1 },
++			{ -1, 4 },
++			{ 3650, 8 },
++			{ 3651, 8 },
++			{ 3652, 4 },
++			{ 3653, 4 },
++			{ 3654, 2 },
++			{ 3655, 2 },
++			{ 3656, 2 },
++			{ 3657, 2 },
++			{ 3658, 2 },
++			{ 3659, 1 },
++			{ 3660, 1 },
++			{ 3661, 1 },
++			{ 3662, 1 },
++			{ 3663, 1 },
++			{ 3664, 1 },
++			{ 3665, 1 },
++			{ 3685, 1 },
++			{ 3693, 1 },
++			{ 3694, 1 },
++			{ -1, 4 },
++			{ 3666, 8 },
++			{ 3667, 8 },
++			{ 3668, 4 },
++			{ 3669, 4 },
++			{ 3670, 2 },
++			{ 3671, 2 },
++			{ 3672, 2 },
++			{ 3673, 2 },
++			{ 3674, 2 },
++			{ 3675, 1 },
++			{ 3676, 1 },
++			{ 3677, 1 },
++			{ 3678, 1 },
++			{ 3679, 1 },
++			{ 3680, 1 },
++			{ 3681, 1 },
++			{ 3686, 1 },
++			{ 3695, 1 },
++			{ 3696, 1 },
++			{ -1, 4 },
++			{ /* sentinel */ }
++		},
++	},
++	{ 2970,
++		{
++			{ 3800, 4 },
++			{ 3801, 1 },
++			{ 3802, 1 },
++			{ 3803, 1 },
++			{ 3804, 4 },
++			{ 3805, 4 },
++			{ 3806, 1 },
++			{ 3807, 4 },
++			{ 3808, 4 },
++			{ 3809, 4 },
++			{ 3810, 4 },
++			{ 3811, 4 },
++			{ 3812, 4 },
++			{ 3813, 4 },
++			{ 3814, 4 },
++			{ 3815, 4 },
++			{ 3816, 1 },
++			{ 3817, 4 },
++			{ 3818, 4 },
++			{ 3819, 4 },
++			{ 3820, 4 },
++			{ 3821, 4 },
++			{ 3822, 4 },
++			{ 3823, 4 },
++			{ 3824, 4 },
++			{ 3825, 4 },
++			{ 3826, 4 },
++			{ 3827, 4 },
++			{ 3828, 4 },
++			{ 3829, 4 },
++			{ 3830, 4 },
++			{ 3831, 4 },
++			{ 3832, 1 },
++			{ 3833, 4 },
++			{ 3834, 4 },
++			{ 3835, 4 },
++			{ 3836, 4 },
++			{ 3837, 4 },
++			{ 3838, 1 },
++			{ 3839, 4 },
++			{ 3840, 4 },
++			{ /* sentinel */ }
++		},
++	},
++	{ 2980,
++		{
++			{ 3900, 4 },
++			{ 3901, 1 },
++			{ 3902, 1 },
++			{ 3903, 4 },
++			{ 3904, 4 },
++			{ 3905, 4 },
++			{ 3906, 4 },
++			{ 3907, 4 },
++			{ 3908, 4 },
++			{ 3909, 4 },
++			{ 3910, 4 },
++			{ 3911, 4 },
++			{ 3912, 4 },
++			{ 3913, 4 },
++			{ 3914, 4 },
++			{ 3915, 4 },
++			{ 3916, 4 },
++			{ 3917, 1 },
++			{ 3918, 4 },
++			{ 3919, 1 },
++			{ 3920, 1 },
++			{ 3921, 4 },
++			{ 3922, 4 },
++			{ 3923, 4 },
++			{ 3924, 4 },
++			{ 3925, 4 },
++			{ 3926, 4 },
++			{ 3927, 4 },
++			{ 3928, 4 },
++			{ 3929, 4 },
++			{ 3930, 4 },
++			{ 3931, 4 },
++			{ 3932, 4 },
++			{ 3933, 4 },
++			{ 3934, 4 },
++			{ 3935, 1 },
++			{ /* sentinel */ }
++		},
++	},
++	{ 2990,
++		{
++			{ 4100, 1 },
++			{ 4101, 1 },
++			{ 4102, 1 },
++			{ 4103, 1 },
++			{ 4104, 1 },
++			{ 4105, 1 },
++			{ 4106, 1 },
++			{ 4107, 1 },
++			{ 4108, 4 },
++			{ 4109, 4 },
++			{ 4110, 4 },
++			{ 4111, 4 },
++			{ 4112, 4 },
++			{ 4113, 4 },
++			{ /* sentinel */ }
++		},
++	},
++	{ 3050,
++		{
++			{ 5500, 1 },
++			{ 5501, 1 },
++			{ -1, 14 },
++			{ 5502, 8 },
++			{ 5503, 8 },
++			{ 5504, 4 },
++			{ 5505, 4 },
++			{ 5506, 2 },
++			{ 5507, 2 },
++			{ 5508, 2 },
++			{ 5509, 2 },
++			{ 5510, 2 },
++			{ 5511, 1 },
++			{ 5512, 1 },
++			{ 5513, 1 },
++			{ 5514, 1 },
++			{ 5515, 1 },
++			{ 5516, 1 },
++			{ 5517, 1 },
++			{ 5582, 1 },
++			{ 5587, 1 },
++			{ 5588, 1 },
++			{ -1, 4 },
++			{ 5518, 8 },
++			{ 5519, 8 },
++			{ 5520, 4 },
++			{ 5521, 4 },
++			{ 5522, 2 },
++			{ 5523, 2 },
++			{ 5524, 2 },
++			{ 5525, 2 },
++			{ 5526, 2 },
++			{ 5527, 1 },
++			{ 5528, 1 },
++			{ 5529, 1 },
++			{ 5530, 1 },
++			{ 5531, 1 },
++			{ 5532, 1 },
++			{ 5533, 1 },
++			{ 5583, 1 },
++			{ 5589, 1 },
++			{ 5590, 1 },
++			{ -1, 4 },
++			{ 5534, 8 },
++			{ 5535, 8 },
++			{ 5536, 4 },
++			{ 5537, 4 },
++			{ 5538, 2 },
++			{ -1, 2 },
++			{ 5540, 2 },
++			{ 5541, 2 },
++			{ 5542, 2 },
++			{ 5543, 1 },
++			{ 5544, 1 },
++			{ 5545, 1 },
++			{ 5546, 1 },
++			{ 5547, 1 },
++			{ 5548, 1 },
++			{ 5549, 1 },
++			{ 5584, 1 },
++			{ 5591, 1 },
++			{ 5592, 1 },
++			{ -1, 1 },
++			{ 5539, 2 },
++			{ -1, 1 },
++			{ 5550, 8 },
++			{ 5551, 8 },
++			{ 5552, 4 },
++			{ 5553, 4 },
++			{ 5554, 2 },
++			{ 5555, 2 },
++			{ 5556, 2 },
++			{ 5557, 2 },
++			{ 5558, 2 },
++			{ 5559, 1 },
++			{ 5560, 1 },
++			{ 5561, 1 },
++			{ 5562, 1 },
++			{ 5563, 1 },
++			{ 5564, 1 },
++			{ 5565, 1 },
++			{ 5585, 1 },
++			{ 5593, 1 },
++			{ 5594, 1 },
++			{ -1, 4 },
++			{ 5566, 8 },
++			{ 5567, 8 },
++			{ 5568, 4 },
++			{ 5569, 4 },
++			{ 5570, 2 },
++			{ 5571, 2 },
++			{ 5572, 2 },
++			{ 5573, 2 },
++			{ 5574, 2 },
++			{ 5575, 1 },
++			{ 5576, 1 },
++			{ 5577, 1 },
++			{ 5578, 1 },
++			{ 5579, 1 },
++			{ 5580, 1 },
++			{ 5581, 1 },
++			{ 5586, 1 },
++			{ 5595, 1 },
++			{ 5596, 1 },
++			{ -1, 4 },
++			{ /* sentinel */ }
++		},
++	},
+ 	{ -1, /* sentinel */ }
+ };
+ 
+@@ -1942,6 +2287,13 @@
+ 	{ 3328, 0x5e00, 0x00e },
+ 	{ 3329, 0x5f00, 0x00e },
+ 	{ 3400, 0x6100, 0x01c },
++	{ 2500, 0x0500, 0x015 },
++	{ 2610, 0x0700, 0x018 },
++	{ 2691, 0x2600, 0x100 },
++	{ 2970, 0x2900, 0x08f },
++	{ 2980, 0x2a00, 0x07e },
++	{ 2990, 0x2c00, 0x020 },
++	{ 3050, 0x3900, 0x100 },
+ 	{ /* sentinel */}
+ };
+ 
+--- a/qmi/sns_reg.c
++++ b/qmi/sns_reg.c
+@@ -55,3 +55,47 @@
+ 		.data_type = QMI_EOTI,
+ 	},
+ };
++
++struct qmi_elem_info sns_reg_group_write_req_ei[] = {
++	{
++		.data_type  = QMI_UNSIGNED_2_BYTE,
++		.elem_len   = 1,
++		.elem_size  = sizeof(unsigned short),
++		.array_type = NO_ARRAY,
++		.tlv_type   = 0x01,
++		.offset     = offsetof(struct sns_reg_group_write_req, id),
++	},
++	{
++		.data_type  = QMI_DATA_LEN,
++		.elem_len   = 1,
++		.elem_size  = sizeof(unsigned short),
++		.array_type = NO_ARRAY,
++		.tlv_type   = 0x02,
++		.offset     = offsetof(struct sns_reg_group_write_req, data_len),
++	},
++	{
++		.data_type  = QMI_UNSIGNED_1_BYTE,
++		.elem_len   = SNS_REG_GROUP_DATA_MAX_LEN,
++		.elem_size  = sizeof(unsigned char),
++		.array_type = VAR_LEN_ARRAY,
++		.tlv_type   = 0x02,
++		.offset     = offsetof(struct sns_reg_group_write_req, data),
++	},
++	{
++		.data_type = QMI_EOTI,
++	},
++};
++
++struct qmi_elem_info sns_reg_group_write_resp_ei[] = {
++	{
++		.data_type  = QMI_UNSIGNED_2_BYTE,
++		.elem_len   = 1,
++		.elem_size  = sizeof(unsigned short),
++		.array_type = NO_ARRAY,
++		.tlv_type   = 0x02,
++		.offset     = offsetof(struct sns_reg_group_write_resp, result),
++	},
++	{
++		.data_type = QMI_EOTI,
++	},
++};
+--- a/qmi/sns_reg.h
++++ b/qmi/sns_reg.h
+@@ -9,6 +9,7 @@
+ #define SNS_REG_QMI_INS_ID		0
+ 
+ #define SNS_REG_GROUP_MSG_ID		0x4
++#define SNS_REG_GROUP_WRITE_MSG_ID	0x5
+ #define SNS_REG_GROUP_DATA_MAX_LEN	0x100
+ 
+ struct sns_reg_group_req {
+@@ -22,5 +23,17 @@
+ 	unsigned char data[SNS_REG_GROUP_DATA_MAX_LEN];
+ };
+ 
++struct sns_reg_group_write_req {
++	unsigned short id;
++	unsigned short data_len;
++	unsigned char data[SNS_REG_GROUP_DATA_MAX_LEN];
++};
++
++struct sns_reg_group_write_resp {
++	unsigned short result;
++};
++
+ extern struct qmi_elem_info sns_reg_group_req_ei[];
+ extern struct qmi_elem_info sns_reg_group_resp_ei[];
++extern struct qmi_elem_info sns_reg_group_write_req_ei[];
++extern struct qmi_elem_info sns_reg_group_write_resp_ei[];
