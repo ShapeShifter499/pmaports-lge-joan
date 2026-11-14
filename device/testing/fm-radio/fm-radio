@@ -430,15 +430,77 @@ def find_fm_capture():
     return None
 
 
-def list_outputs():
-    """[(sink name, description)] from the sound server, [] if unreachable."""
+def _percent(sink):
+    """Loudest channel of a sink's volume in percent, as the system shows it."""
+    try:
+        return max(int(ch["value_percent"].rstrip("%"))
+                   for ch in sink["volume"].values())
+    except (KeyError, ValueError, AttributeError, TypeError):
+        return None
+
+
+def query_outputs():
+    """([(sink name, description)], {sink name: (volume %, muted)},
+    default sink name) from the sound server; empty if unreachable."""
     try:
         out = subprocess.run(["pactl", "-f", "json", "list", "sinks"],
                              capture_output=True, timeout=5, check=True).stdout
-        return [(s["name"], s.get("description") or s["name"])
-                for s in json.loads(out) if s.get("name") != "auto_null"]
+        sinks = [s for s in json.loads(out) if s.get("name") != "auto_null"]
+        default = subprocess.run(["pactl", "get-default-sink"],
+                                 capture_output=True, timeout=5,
+                                 text=True).stdout.strip()
+        return ([(s["name"], s.get("description") or s["name"])
+                 for s in sinks],
+                {s["name"]: (_percent(s), bool(s.get("mute"))) for s in sinks},
+                default)
     except (OSError, ValueError, KeyError, subprocess.SubprocessError):
-        return []
+        return [], {}, ""
+
+
+def list_outputs():
+    """[(sink name, description)] from the sound server, [] if unreachable."""
+    return query_outputs()[0]
+
+
+def set_output_volume(sink, percent):
+    try:
+        subprocess.run(["pactl", "set-sink-volume", sink, f"{percent}%"],
+                       timeout=5, check=True)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+class SoundServerWatch:
+    """Call back (on the main loop) when outputs or their volumes change."""
+
+    def __init__(self, callback):
+        self.callback = callback
+        self.proc = None
+        self.pending = False
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _run(self):
+        try:
+            self.proc = subprocess.Popen(
+                ["pactl", "subscribe"], stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, text=True)
+        except OSError:
+            return
+        for line in self.proc.stdout:
+            # sink volume and mute, sinks coming and going, default sink
+            if (" on sink #" in line or " on server" in line) \
+                    and not self.pending:
+                self.pending = True
+                GLib.timeout_add(150, self._fire)
+
+    def _fire(self):
+        self.pending = False
+        self.callback()
+        return GLib.SOURCE_REMOVE
+
+    def stop(self):
+        if self.proc:
+            self.proc.terminate()
 
 
 def _move_own_stream(sink):
@@ -534,7 +596,7 @@ class Audio:
     def recording(self):
         return self.rec is not None
 
-    def start(self, device, output=None, volume=1.0):
+    def start(self, device, output=None):
         self.stop()
         desc = (f"alsasrc name=src device={device} ! {self.CAPS} ! "
                 "tee name=t "
@@ -561,7 +623,9 @@ class Audio:
         self.sink.set_property("stream-properties", props)
         if output:
             self.sink.set_property("device", output)
-        self.sink.set_property("volume", volume)
+        # The stream plays at full level; loudness is the output's own
+        # volume, which is what the system and the slider show.
+        self.sink.set_property("volume", 1.0)
         self.pipeline.get_by_name("tap").connect("new-sample", self._on_sample)
         # Both ends offer a clock, and which one the pipeline picked varied
         # from start to start; the output's clock also jumps when the stream
@@ -616,10 +680,7 @@ class Audio:
             return
         self.sink.set_property("device", output)
         _move_own_stream(output)
-
-    def set_volume(self, volume):
-        if self.sink:
-            self.sink.set_property("volume", volume)
+        self.sink.set_property("volume", 1.0)
 
     def start_recording(self, path, fmt, quality, done=None):
         """Record to path; done(path, error) is called when the file is
@@ -697,6 +758,10 @@ class RadioWindow(Adw.ApplicationWindow):
         self.keep_play_setting = False
         self.audio_retries = 0
         self.rds_log = None
+        self.output_state = {}
+        self.default_output = ""
+        self.volume_touched = 0.0
+        self.volume_apply_pending = False
 
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(Adw.HeaderBar())
@@ -767,8 +832,8 @@ class RadioWindow(Adw.ApplicationWindow):
             Gtk.Orientation.HORIZONTAL, 0, 100, 1)
         self.volume.set_hexpand(True)
         self.volume.set_valign(Gtk.Align.CENTER)
-        self.volume.set_value(self.settings.get("volume", 60))
-        self.volume.connect("value-changed", self.on_volume_changed)
+        self.volume_handler = self.volume.connect(
+            "value-changed", self.on_volume_changed)
         self.volume_row.add_suffix(self.volume)
         sound.add(self.volume_row)
 
@@ -821,8 +886,9 @@ class RadioWindow(Adw.ApplicationWindow):
 
         self.open_radio()
         self.refresh_outputs()
+        self.sound_watch = SoundServerWatch(self.refresh_outputs)
         GLib.timeout_add(500, self.poll)
-        GLib.timeout_add_seconds(3, self.refresh_outputs)
+        GLib.timeout_add_seconds(5, self.refresh_outputs)   # safety net
         self.connect("close-request", self.on_close)
 
     # device -----------------------------------------------------------
@@ -876,8 +942,7 @@ class RadioWindow(Adw.ApplicationWindow):
         if not self.play_row.get_active():
             self.audio_row.set_subtitle("Off")
             return
-        if self.audio.start(self.capture, self.selected_output(),
-                            self.volume.get_value() / 100):
+        if self.audio.start(self.capture, self.selected_output()):
             self.audio_row.set_subtitle(f"Playing from {self.capture}")
             GLib.timeout_add_seconds(5, self.audio_settled)
 
@@ -947,9 +1012,25 @@ class RadioWindow(Adw.ApplicationWindow):
             return self.outputs[i - 1][0]
         return None
 
+    def volume_output(self):
+        """The output whose volume the slider shows and sets."""
+        return self.selected_output() or self.default_output
+
+    def show_volume(self):
+        vol, muted = self.output_state.get(self.volume_output(), (None, False))
+        self.volume_row.set_subtitle("Muted" if muted else "")
+        self.volume.set_sensitive(vol is not None)
+        # Leave the slider alone while a finger is on it.
+        if vol is None or time.monotonic() - self.volume_touched < 0.8:
+            return
+        self.volume.handler_block(self.volume_handler)
+        self.volume.set_value(min(vol, 100))
+        self.volume.handler_unblock(self.volume_handler)
+
     def refresh_outputs(self):
-        outputs = list_outputs()
+        outputs, self.output_state, self.default_output = query_outputs()
         if outputs == self.outputs and self.output_model.get_n_items():
+            self.show_volume()
             return GLib.SOURCE_CONTINUE
         want = self.selected_output() if self.outputs else \
             self.settings.get("output")
@@ -962,12 +1043,15 @@ class RadioWindow(Adw.ApplicationWindow):
         self.output_row.set_selected(
             names.index(want) + 1 if want in names else 0)
         self.output_row.handler_unblock(self.output_handler)
+        self.show_volume()
         return GLib.SOURCE_CONTINUE
 
     def on_output_selected(self, *_):
         name = self.selected_output()
         self.settings["output"] = name
         save_settings(self.settings)
+        self.volume_touched = 0.0
+        self.show_volume()
         if not (self.audio and self.audio.playing):
             return
         if name:
@@ -975,11 +1059,20 @@ class RadioWindow(Adw.ApplicationWindow):
         elif not self.audio.recording:
             self.start_audio()      # back to whatever the system default is
 
-    def on_volume_changed(self, scale):
-        self.settings["volume"] = round(scale.get_value())
-        save_settings(self.settings)
-        if self.audio:
-            self.audio.set_volume(scale.get_value() / 100)
+    def on_volume_changed(self, _scale):
+        """The slider is the volume of the chosen output itself, the same
+        value the system shows; set it there, a few times a second at most."""
+        self.volume_touched = time.monotonic()
+        if not self.volume_apply_pending:
+            self.volume_apply_pending = True
+            GLib.timeout_add(80, self.apply_volume)
+
+    def apply_volume(self):
+        self.volume_apply_pending = False
+        sink = self.volume_output()
+        if sink:
+            set_output_volume(sink, round(self.volume.get_value()))
+        return GLib.SOURCE_REMOVE
 
     def current_format(self):
         i = self.format_row.get_selected()
@@ -1198,6 +1291,7 @@ class RadioWindow(Adw.ApplicationWindow):
         self.toasts.add_toast(Adw.Toast(title=text))
 
     def on_close(self, *_):
+        self.sound_watch.stop()
         if self.audio:
             self.audio.stop()       # also finishes a recording in progress
         self.close_rds_log()
