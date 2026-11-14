@@ -539,7 +539,11 @@ class Audio:
         desc = (f"alsasrc name=src device={device} ! {self.CAPS} ! "
                 "tee name=t "
                 "t. ! queue max-size-time=300000000 leaky=downstream ! "
-                "audioconvert ! pulsesink name=out "
+                # sync=false: play the samples as they arrive. Aligning each
+                # 10 ms of live audio to the clock leaves it no slack, and an
+                # output that works in large chunks (the speaker takes 130 ms
+                # at a time) then drops a quarter of the audio as "late".
+                "audioconvert ! pulsesink name=out sync=false "
                 "t. ! queue max-size-time=2000000000 leaky=downstream ! "
                 "appsink name=tap emit-signals=true sync=false async=false "
                 "max-buffers=200 drop=true")
