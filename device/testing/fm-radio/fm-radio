@@ -7,8 +7,14 @@ for the LG V30's WCN3990 receiver (radio-qca-fm) but not specific to it.
 It tunes, seeks with the hardware seek, shows signal strength and stereo,
 decodes the RDS programme service name and radiotext, and keeps presets.
 
-Sound is a separate path: the tuner only demodulates. Where the kernel
-offers no FM capture device yet, the app says so instead of pretending.
+Sound is a separate path: the tuner only demodulates, and the audio arrives
+on an ALSA capture device. The app reads that device, plays it to whichever
+PipeWire/PulseAudio output is chosen (so the speaker works while headphones
+are plugged in as the antenna), and can record it to a file. Where the
+kernel offers no FM capture device, the app says so instead of pretending.
+
+The capture device is $FM_RADIO_CAPTURE if set, else the first ALSA capture
+PCM whose name contains "FM".
 """
 import ctypes
 import errno
@@ -16,14 +22,23 @@ import fcntl
 import json
 import os
 import struct
+import subprocess
 import sys
 import threading
+import time
 
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk  # noqa: E402
+
+try:
+    gi.require_version("Gst", "1.0")
+    from gi.repository import Gst
+    Gst.init(None)
+except (ValueError, ImportError):
+    Gst = None
 
 APP_ID = "io.github.ShapeShifter499.FmRadio"
 DEVICE = os.environ.get("FM_RADIO_DEVICE", "/dev/radio0")
@@ -129,18 +144,22 @@ class Radio:
         fcntl.ioctl(self.fd, VIDIOC_S_CTRL, c)
 
     def read_rds(self):
-        """Return a list of (block_id, word) for whatever RDS is queued."""
+        """Return (raw bytes, [(block_id, word)]) for whatever RDS is queued.
+
+        The raw bytes are V4L2 RDS blocks, three bytes each: data LSB,
+        data MSB, then the block number with the error flags.
+        """
         try:
             data = os.read(self.fd, 3 * 64)
         except BlockingIOError:
-            return []
+            return b"", []
         out = []
         for i in range(0, len(data) - len(data) % 3, 3):
             lsb, msb, blk = struct.unpack_from("BBB", data, i)
             if blk & 0x80:          # uncorrectable error
                 continue
             out.append((blk & 0x07, (msb << 8) | lsb))
-        return out
+        return data, out
 
     def close(self):
         os.close(self.fd)
@@ -154,6 +173,12 @@ class RdsDecoder:
 
     def reset(self):
         self.pi = None
+        self.pi_candidate = None
+        self.pi_seen = 0
+        self.pty = None
+        self.tp = None
+        self.ta = None
+        self.clock = None
         self.ps = [" "] * 8
         self.rt = [" "] * 64
         self.rt_ab = None
@@ -172,10 +197,42 @@ class RdsDecoder:
         self.group = {}
         if 1 not in g:
             return False
-        self.pi = g[0]
+        # Blocks with undetected bit errors are common on a weak signal. The
+        # programme ID heads every group and does not change, so trust a
+        # group only if it carries the ID seen several times in a row.
+        if g[0] == 0:
+            return False            # no station has ID 0000: an empty group
+        if g[0] != self.pi:
+            if g[0] == self.pi_candidate:
+                self.pi_seen += 1
+            else:
+                self.pi_candidate, self.pi_seen = g[0], 1
+            if self.pi_seen < 3:
+                return False
+            self.reset()
+            self.pi = g[0]
+        self.pi_candidate = None
         b = g[1]
         gtype, version_b = b >> 12, bool(b & 0x0800)
+        self.pty = (b >> 5) & 0x1f
+        self.tp = bool(b & 0x0400)
+        if gtype == 4 and not version_b and 2 in g:
+            # Clock time and date: modified Julian day, UTC, local offset.
+            mjd = ((b & 0x03) << 15) | (g[2] >> 1)
+            hour = ((g[2] & 0x01) << 4) | (g[3] >> 12)
+            minute = (g[3] >> 6) & 0x3f
+            half_hours = (g[3] & 0x1f) * (-1 if g[3] & 0x20 else 1)
+            if mjd and hour < 24 and minute < 60:
+                y = int((mjd - 15078.2) / 365.25)
+                mo = int((mjd - 14956.1 - int(y * 365.25)) / 30.6001)
+                day = mjd - 14956 - int(y * 365.25) - int(mo * 30.6001)
+                k = 1 if mo in (14, 15) else 0
+                self.clock = (f"{1900 + y + k:04d}-{mo - 1 - k * 12:02d}-"
+                              f"{day:02d} {hour:02d}:{minute:02d} UTC"
+                              f"{half_hours / 2:+g}h")
+            return True
         if gtype == 0:
+            self.ta = bool(b & 0x10)
             seg = b & 0x03
             self.ps[seg * 2] = _rds_char(g[3] >> 8)
             self.ps[seg * 2 + 1] = _rds_char(g[3] & 0xff)
@@ -213,6 +270,102 @@ def _rds_char(c):
     return chr(c) if 0x20 <= c < 0x7f else " "
 
 
+# Programme types: North American RBDS / European RDS (they differ).
+PTY_RBDS = ["None", "News", "Information", "Sports", "Talk", "Rock",
+            "Classic Rock", "Adult Hits", "Soft Rock", "Top 40", "Country",
+            "Oldies", "Soft", "Nostalgia", "Jazz", "Classical",
+            "Rhythm and Blues", "Soft R&B", "Foreign Language",
+            "Religious Music", "Religious Talk", "Personality", "Public",
+            "College", "Spanish Talk", "Spanish Music", "Hip Hop", "", "",
+            "Weather", "Emergency Test", "Emergency"]
+PTY_RDS = ["None", "News", "Current Affairs", "Information", "Sport",
+           "Education", "Drama", "Culture", "Science", "Varied", "Pop Music",
+           "Rock Music", "Easy Listening", "Light Classical",
+           "Serious Classical", "Other Music", "Weather", "Finance",
+           "Children", "Social Affairs", "Religion", "Phone-in", "Travel",
+           "Leisure", "Jazz", "Country", "National Music", "Oldies", "Folk",
+           "Documentary", "Alarm Test", "Alarm"]
+
+
+class RdsLog:
+    """RDS written next to a recording: a readable log and/or raw blocks.
+
+    Text: one line per change, stamped with the position in the recording.
+    Raw: the V4L2 RDS block stream exactly as the tuner delivered it,
+    three bytes per block (data LSB, data MSB, block number + error flags),
+    including blocks with errors.
+    """
+
+    def __init__(self, base, text, raw, khz):
+        self.started = time.monotonic()
+        self.text = open(base + ".rds.txt", "w") if text else None
+        self.raw = open(base + ".rds", "wb") if raw else None
+        self.last = {}
+        self.pending = {}
+        self.next_signal = 0.0
+        self.line(f"Recording started {time.strftime('%Y-%m-%d %H:%M:%S %z')}")
+        self.tuned(khz)
+
+    def line(self, text):
+        if not self.text:
+            return
+        t = time.monotonic() - self.started
+        self.text.write(f"[{int(t // 60):02d}:{t % 60:04.1f}] {text}\n")
+        self.text.flush()
+
+    def tuned(self, khz):
+        self.last = {}
+        self.pending = {}
+        self.line(f"Tuned {khz / 1000:.1f} MHz")
+
+    def blocks(self, data):
+        if self.raw and data:
+            self.raw.write(data)
+
+    def _settled(self, key, value):
+        """True once a value has been the same on two polls in a row and
+        differs from what was last logged (texts arrive in pieces)."""
+        if value == self.last.get(key):
+            self.pending.pop(key, None)
+            return False
+        if self.pending.get(key) != value:
+            self.pending[key] = value
+            return False
+        self.last[key] = value
+        return True
+
+    def update(self, rds, signal_pct, stereo):
+        if not self.text:
+            return
+        if rds.pi is not None and self._settled("pi", rds.pi):
+            self.line(f"Programme ID {rds.pi:04X}")
+        if rds.pty is not None and self._settled("pty", rds.pty):
+            self.line(f"Programme type {rds.pty} "
+                      f"(RBDS: {PTY_RBDS[rds.pty] or '-'}, "
+                      f"RDS: {PTY_RDS[rds.pty]})")
+        if rds.tp is not None and self._settled("tp", (rds.tp, rds.ta)):
+            self.line(f"Traffic programme {'yes' if rds.tp else 'no'}, "
+                      f"announcement {'on' if rds.ta else 'off'}")
+        if rds.name and self._settled("ps", rds.name):
+            self.line(f"Station name: {rds.name}")
+        if rds.text and self._settled("rt", rds.text):
+            self.line(f"Radiotext: {rds.text}")
+        if rds.clock and self._settled("ct", rds.clock):
+            self.line(f"Clock time: {rds.clock}")
+        now = time.monotonic()
+        if now >= self.next_signal:
+            self.next_signal = now + 10
+            self.line(f"Signal {signal_pct:.0f}%, "
+                      f"{'stereo' if stereo else 'mono'}")
+
+    def close(self):
+        self.line("Recording stopped")
+        for f in (self.text, self.raw):
+            if f:
+                f.close()
+        self.text = self.raw = None
+
+
 # --- presets ---------------------------------------------------------------
 
 def _presets_path():
@@ -234,13 +387,292 @@ def save_presets(presets):
         json.dump(sorted(set(presets)), f)
 
 
-def fm_capture_present():
-    """True if ALSA lists a capture PCM that names FM."""
+def _settings_path():
+    return os.path.join(GLib.get_user_config_dir(), "fm-radio", "settings.json")
+
+
+def load_settings():
+    try:
+        with open(_settings_path()) as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_settings(settings):
+    path = _settings_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(settings, f)
+
+
+# --- sound -------------------------------------------------------------------
+
+def find_fm_capture():
+    """ALSA device string of the FM capture PCM, or None.
+
+    $FM_RADIO_CAPTURE wins; otherwise the first capture PCM whose name
+    contains "FM" in /proc/asound/pcm ("00-07: FM Radio (*) : : capture 1").
+    """
+    dev = os.environ.get("FM_RADIO_CAPTURE")
+    if dev:
+        return dev
     try:
         with open("/proc/asound/pcm") as f:
-            return any("FM" in line and "capture" in line for line in f)
-    except OSError:
+            for line in f:
+                ident, _, rest = line.partition(":")
+                if "FM" in rest and "capture" in rest:
+                    card, _, pcm = ident.strip().partition("-")
+                    return f"hw:{int(card)},{int(pcm)}"
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def list_outputs():
+    """[(sink name, description)] from the sound server, [] if unreachable."""
+    try:
+        out = subprocess.run(["pactl", "-f", "json", "list", "sinks"],
+                             capture_output=True, timeout=5, check=True).stdout
+        return [(s["name"], s.get("description") or s["name"])
+                for s in json.loads(out) if s.get("name") != "auto_null"]
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+        return []
+
+
+def _move_own_stream(sink):
+    """Move this process's playback stream to another output."""
+    try:
+        out = subprocess.run(["pactl", "-f", "json", "list", "sink-inputs"],
+                             capture_output=True, timeout=5, check=True).stdout
+        pid = str(os.getpid())
+        moved = False
+        for si in json.loads(out):
+            if si.get("properties", {}).get("application.process.id") == pid:
+                subprocess.run(["pactl", "move-sink-input", str(si["index"]),
+                                sink], timeout=5, check=True)
+                moved = True
+        return moved
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
         return False
+
+
+# Recording formats: (id, label, extension, [(quality label, value)],
+# encoder description with {q}, elements that must exist).
+# FM audio is 15 kHz wide; the capture is 48 kHz 16-bit stereo, so the
+# lossless formats store exactly what the tuner delivers.
+FORMATS = [
+    ("flac", "FLAC (lossless)", "flac",
+     [("Lossless", 5)],
+     "flacenc quality={q}", ("flacenc",)),
+    ("wav", "WAV (lossless)", "wav",
+     [("16-bit PCM", 0)],
+     "wavenc", ("wavenc",)),
+    ("opus", "Opus", "opus",
+     [("64 kbit/s", 64000), ("96 kbit/s", 96000), ("128 kbit/s", 128000),
+      ("192 kbit/s", 192000)],
+     "opusenc bitrate={q} ! oggmux", ("opusenc", "oggmux")),
+    ("mp3", "MP3", "mp3",
+     [("128 kbit/s", 128), ("192 kbit/s", 192), ("256 kbit/s", 256),
+      ("320 kbit/s", 320)],
+     "lamemp3enc target=bitrate cbr=true bitrate={q} ! xingmux",
+     ("lamemp3enc", "xingmux")),
+    ("vorbis", "Ogg Vorbis", "ogg",
+     [("Low (~112 kbit/s)", 0.3), ("Medium (~160 kbit/s)", 0.5),
+      ("High (~224 kbit/s)", 0.7), ("Very high (~320 kbit/s)", 0.9)],
+     "vorbisenc quality={q} ! oggmux", ("vorbisenc", "oggmux")),
+    ("aac", "AAC (M4A)", "m4a",
+     [("96 kbit/s", 96000), ("128 kbit/s", 128000), ("192 kbit/s", 192000),
+      ("256 kbit/s", 256000)],
+     "fdkaacenc bitrate={q} ! mp4mux", ("fdkaacenc", "mp4mux")),
+]
+DEFAULT_QUALITY = {"opus": 2, "mp3": 1, "vorbis": 1, "aac": 1}
+
+
+def available_formats():
+    if Gst is None:
+        return []
+    return [f for f in FORMATS
+            if all(Gst.ElementFactory.find(e) for e in f[5])]
+
+
+def recordings_dir():
+    base = (GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_MUSIC)
+            or os.path.join(GLib.get_home_dir(), "Music"))
+    return os.path.join(base, "FM Radio")
+
+
+class Audio:
+    """Capture the tuner's audio, play it to one output, optionally record.
+
+    The capture feeds a tee with two fixed branches: one plays through the
+    sound server, the other ends in a tap. A recording is a small pipeline
+    of its own (encoder, container, file) fed from the tap, with timestamps
+    counted from its own first sample. Nothing is added to or removed from
+    the live pipeline, so starting, stopping and switching outputs cannot
+    disturb each other.
+    """
+
+    RATE = 48000
+    CAPS = "audio/x-raw,format=S16LE,rate=48000,channels=2,layout=interleaved"
+
+    def __init__(self, on_error):
+        self.on_error = on_error
+        self.pipeline = None
+        self.sink = None
+        self.lock = threading.Lock()
+        self.rec = None        # (pipeline, appsrc, path, done callback)
+        self.rec_frames = 0
+        self.rec_started = 0.0
+
+    @property
+    def playing(self):
+        return self.pipeline is not None
+
+    @property
+    def recording(self):
+        return self.rec is not None
+
+    def start(self, device, output=None, volume=1.0):
+        self.stop()
+        desc = (f"alsasrc name=src device={device} ! {self.CAPS} ! "
+                "tee name=t "
+                "t. ! queue max-size-time=300000000 leaky=downstream ! "
+                "audioconvert ! pulsesink name=out "
+                "t. ! queue max-size-time=2000000000 leaky=downstream ! "
+                "appsink name=tap emit-signals=true sync=false async=false "
+                "max-buffers=200 drop=true")
+        try:
+            self.pipeline = Gst.parse_launch(desc)
+        except GLib.Error as e:
+            self.pipeline = None
+            self.on_error(e.message)
+            return False
+        self.sink = self.pipeline.get_by_name("out")
+        self.sink.set_property("client-name", "FM Radio")
+        props = Gst.Structure.new_empty("props")
+        props.set_value("media.role", "music")
+        props.set_value("media.name", "FM Radio")
+        self.sink.set_property("stream-properties", props)
+        if output:
+            self.sink.set_property("device", output)
+        self.sink.set_property("volume", volume)
+        self.pipeline.get_by_name("tap").connect("new-sample", self._on_sample)
+        # Both ends offer a clock, and which one the pipeline picked varied
+        # from start to start; the output's clock also jumps when the stream
+        # moves to another output. Use the system clock, always.
+        self.pipeline.use_clock(Gst.SystemClock.obtain())
+        bus = self.pipeline.get_bus()
+        bus.add_signal_watch()
+        bus.connect("message::error", self._on_bus_error)
+        self.pipeline.set_state(Gst.State.PLAYING)
+        return True
+
+    def _on_bus_error(self, _bus, msg):
+        err, _dbg = msg.parse_error()
+        text = err.message
+        self.stop()
+        self.on_error(text)
+
+    def _on_sample(self, tap):
+        """Streaming thread: hand each captured buffer to the recorder."""
+        sample = tap.emit("pull-sample")
+        if sample is None:
+            return Gst.FlowReturn.OK
+        with self.lock:
+            rec = self.rec
+            if rec is None:
+                return Gst.FlowReturn.OK
+            data = sample.get_buffer()
+            frames = data.get_size() // 4
+            # A new buffer over the same memory: the original also goes to
+            # the playback branch and must keep its own timestamps.
+            buf = data.copy_region(Gst.BufferCopyFlags.MEMORY, 0,
+                                   data.get_size())
+            buf.pts = self.rec_frames * Gst.SECOND // self.RATE
+            buf.dts = Gst.CLOCK_TIME_NONE
+            buf.duration = frames * Gst.SECOND // self.RATE
+            self.rec_frames += frames
+            rec[1].emit("push-buffer", buf)
+        return Gst.FlowReturn.OK
+
+    def stop(self):
+        """Stop everything; a recording in progress is finished first."""
+        self._finish_recording(wait=True)
+        if not self.pipeline:
+            return
+        self.pipeline.get_bus().remove_signal_watch()
+        self.pipeline.set_state(Gst.State.NULL)
+        self.pipeline = self.sink = None
+
+    def set_output(self, output):
+        """Switch the output; a recording is not affected."""
+        if not self.pipeline or not output:
+            return
+        self.sink.set_property("device", output)
+        _move_own_stream(output)
+
+    def set_volume(self, volume):
+        if self.sink:
+            self.sink.set_property("volume", volume)
+
+    def start_recording(self, path, fmt, quality, done=None):
+        """Record to path; done(path, error) is called when the file is
+        complete, whether it was stopped or failed."""
+        if not self.pipeline or self.rec:
+            return False
+        desc = (f"appsrc name=in format=time caps=\"{self.CAPS}\" "
+                "block=false max-bytes=4000000 ! audioconvert ! "
+                + fmt[4].format(q=quality) + " ! filesink name=file")
+        try:
+            pipeline = Gst.parse_launch(desc)
+        except GLib.Error as e:
+            self.on_error(e.message)
+            return False
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        pipeline.get_by_name("file").set_property("location", path)
+        bus = pipeline.get_bus()
+        bus.add_signal_watch()
+        bus.connect("message::eos", self._on_rec_message)
+        bus.connect("message::error", self._on_rec_message)
+        pipeline.set_state(Gst.State.PLAYING)
+        with self.lock:
+            self.rec_frames = 0
+            self.rec = (pipeline, pipeline.get_by_name("in"), path, done)
+        self.rec_started = time.monotonic()
+        return True
+
+    def stop_recording(self):
+        """Ask the recording to finish; its done callback follows."""
+        with self.lock:
+            rec = self.rec
+        if rec:
+            rec[1].emit("end-of-stream")
+
+    def _on_rec_message(self, _bus, msg):
+        error = None
+        if msg.type == Gst.MessageType.ERROR:
+            error = msg.parse_error()[0].message
+        self._finish_recording(error=error)
+
+    def _finish_recording(self, wait=False, error=None):
+        with self.lock:
+            rec, self.rec = self.rec, None
+        if not rec:
+            return
+        pipeline, src, path, done = rec
+        if wait:
+            # Closing down: end the stream and give the file time to close.
+            src.emit("end-of-stream")
+            msg = pipeline.get_bus().timed_pop_filtered(
+                5 * Gst.SECOND, Gst.MessageType.EOS | Gst.MessageType.ERROR)
+            if msg is not None and msg.type == Gst.MessageType.ERROR:
+                error = msg.parse_error()[0].message
+        pipeline.get_bus().remove_signal_watch()
+        pipeline.set_state(Gst.State.NULL)
+        if done:
+            done(path, error)
 
 
 # --- UI --------------------------------------------------------------------
@@ -253,6 +685,14 @@ class RadioWindow(Adw.ApplicationWindow):
         self.rds = RdsDecoder()
         self.busy = False
         self.presets = load_presets()
+        self.settings = load_settings()
+        self.capture = find_fm_capture()
+        self.audio = Audio(self.on_audio_error) if Gst else None
+        self.outputs = []
+        self.formats = available_formats()
+        self.keep_play_setting = False
+        self.audio_retries = 0
+        self.rds_log = None
 
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(Adw.HeaderBar())
@@ -305,6 +745,66 @@ class RadioWindow(Adw.ApplicationWindow):
         self.audio_row = Adw.ActionRow(title="Sound")
         status.add(self.audio_row)
 
+        sound = Adw.PreferencesGroup(title="Listen")
+        page.add(sound)
+        self.play_row = Adw.SwitchRow(title="Play")
+        self.play_row.set_active(self.settings.get("play", True))
+        self.play_row.connect("notify::active", self.on_play_toggled)
+        sound.add(self.play_row)
+        self.output_model = Gtk.StringList()
+        self.output_row = Adw.ComboRow(
+            title="Output", model=self.output_model,
+            subtitle="Works with headphones plugged in as the antenna")
+        self.output_handler = self.output_row.connect(
+            "notify::selected", self.on_output_selected)
+        sound.add(self.output_row)
+        self.volume_row = Adw.ActionRow(title="Volume")
+        self.volume = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        self.volume.set_hexpand(True)
+        self.volume.set_valign(Gtk.Align.CENTER)
+        self.volume.set_value(self.settings.get("volume", 60))
+        self.volume.connect("value-changed", self.on_volume_changed)
+        self.volume_row.add_suffix(self.volume)
+        sound.add(self.volume_row)
+
+        record = Adw.PreferencesGroup(title="Record")
+        page.add(record)
+        self.format_row = Adw.ComboRow(
+            title="Format",
+            model=Gtk.StringList.new([f[1] for f in self.formats]))
+        self.quality_model = Gtk.StringList()
+        self.quality_row = Adw.ComboRow(title="Quality",
+                                        model=self.quality_model)
+        saved = self.settings.get("format")
+        ids = [f[0] for f in self.formats]
+        if saved in ids:
+            self.format_row.set_selected(ids.index(saved))
+        self.format_row.connect("notify::selected", self.on_format_selected)
+        self.quality_row.connect("notify::selected", self.on_quality_selected)
+        record.add(self.format_row)
+        record.add(self.quality_row)
+        # The raw stream is about 140 bytes a second, so there is no reason
+        # to offer it separately from the readable log.
+        self.rds_row = Adw.SwitchRow(
+            title="Save RDS with recordings",
+            subtitle="A time-stamped text log (.rds.txt: station name, "
+                     "radiotext, programme type, signal) and the raw RDS "
+                     "data (.rds) next to each recording")
+        self.rds_row.set_active(self.settings.get("rds", False))
+        self.rds_row.connect("notify::active", self.on_rds_setting)
+        record.add(self.rds_row)
+        self.record_row = Adw.ActionRow(
+            title="Record", subtitle=f"Saved in {recordings_dir()}")
+        self.record_button = Gtk.Button(label="Start",
+                                        valign=Gtk.Align.CENTER)
+        self.record_button.add_css_class("suggested-action")
+        self.record_button.connect("clicked", self.on_record_clicked)
+        self.record_row.add_suffix(self.record_button)
+        record.add(self.record_row)
+        self.sound_groups = (sound, record)
+        self.fill_qualities()
+
         self.preset_group = Adw.PreferencesGroup(title="Presets")
         add = Gtk.Button(icon_name="list-add-symbolic",
                          tooltip_text="Save this frequency")
@@ -316,7 +816,9 @@ class RadioWindow(Adw.ApplicationWindow):
         self.refresh_presets()
 
         self.open_radio()
+        self.refresh_outputs()
         GLib.timeout_add(500, self.poll)
+        GLib.timeout_add_seconds(3, self.refresh_outputs)
         self.connect("close-request", self.on_close)
 
     # device -----------------------------------------------------------
@@ -343,14 +845,230 @@ class RadioWindow(Adw.ApplicationWindow):
                 self.radio.set_ctrl(cid, val)
             except OSError:
                 pass
-        if fm_capture_present():
-            self.audio_row.set_subtitle("FM capture device present")
-        else:
-            self.audio_row.set_subtitle(
-                "Not available yet: this kernel has no FM capture path, so "
-                "the station plays nowhere. Tuning and RDS work.")
         self.update_frequency()
+        if not self.capture:
+            self.audio_row.set_subtitle(
+                "Not available: this kernel has no FM capture device, so "
+                "the station plays nowhere. Tuning and RDS work.")
+        elif not self.audio:
+            self.audio_row.set_subtitle(
+                "Not available: GStreamer is not installed.")
+        else:
+            for g in self.sound_groups:
+                g.set_sensitive(True)
+            # The receiver powers up on the first tuner call, and its audio
+            # port only answers once it is on: retune before starting sound.
+            self.tune(self.radio.frequency_khz(), then=self.start_audio)
+            return True
+        for g in self.sound_groups:
+            g.set_sensitive(False)
         return True
+
+    # sound ---------------------------------------------------------------
+
+    def start_audio(self):
+        if not (self.audio and self.capture and self.radio):
+            return
+        if not self.play_row.get_active():
+            self.audio_row.set_subtitle("Off")
+            return
+        if self.audio.start(self.capture, self.selected_output(),
+                            self.volume.get_value() / 100):
+            self.audio_row.set_subtitle(f"Playing from {self.capture}")
+            GLib.timeout_add_seconds(5, self.audio_settled)
+
+    def audio_settled(self):
+        if self.audio.playing:
+            self.audio_retries = 0
+        return GLib.SOURCE_REMOVE
+
+    def on_audio_error(self, text):
+        # The receiver's audio port can take a moment to answer after the
+        # tuner powers up; the first start may be refused. Try a few times.
+        if self.audio_retries < 9 and self.play_row.get_active():
+            self.audio_retries += 1
+            self.audio_row.set_subtitle("Starting…")
+            if self.audio_retries % 3 == 0:
+                # Still nothing: the receiver only joins the audio bus at
+                # the moment it is switched on, and sometimes misses it.
+                # Switch it off and on again, then retry.
+                GLib.timeout_add(300, self.restart_tuner)
+            else:
+                GLib.timeout_add(2500, self.retry_audio)
+            return
+        self.audio_retries = 0
+        self.audio_row.set_subtitle(f"Stopped: {text}")
+        self.set_recording_ui(False)
+        self.record_button.set_sensitive(True)
+        if self.play_row.get_active():
+            # Reflect the stop, but keep "play" as the saved preference.
+            self.keep_play_setting = True
+            self.play_row.set_active(False)
+            self.keep_play_setting = False
+
+    def restart_tuner(self):
+        if self.radio and not self.busy:
+            self.radio.close()
+            self.radio = None
+            GLib.timeout_add(800, self.reopen_tuner)
+        else:
+            GLib.timeout_add(2500, self.retry_audio)
+        return GLib.SOURCE_REMOVE
+
+    def reopen_tuner(self):
+        self.open_radio()           # retunes, then starts the sound again
+        return GLib.SOURCE_REMOVE
+
+    def retry_audio(self):
+        if self.play_row.get_active() and not self.audio.playing:
+            self.start_audio()
+        return GLib.SOURCE_REMOVE
+
+    def on_play_toggled(self, *_):
+        on = self.play_row.get_active()
+        if not self.keep_play_setting:
+            self.settings["play"] = on
+            save_settings(self.settings)
+        if not self.audio:
+            return
+        if on:
+            self.start_audio()
+        else:
+            self.audio.stop()       # finishes a recording in progress
+            self.audio_row.set_subtitle("Off")
+
+    def selected_output(self):
+        i = self.output_row.get_selected()
+        if 0 < i <= len(self.outputs):
+            return self.outputs[i - 1][0]
+        return None
+
+    def refresh_outputs(self):
+        outputs = list_outputs()
+        if outputs == self.outputs and self.output_model.get_n_items():
+            return GLib.SOURCE_CONTINUE
+        want = self.selected_output() if self.outputs else \
+            self.settings.get("output")
+        self.outputs = outputs
+        self.output_row.handler_block(self.output_handler)
+        self.output_model.splice(
+            0, self.output_model.get_n_items(),
+            ["System default"] + [desc for _name, desc in outputs])
+        names = [name for name, _desc in outputs]
+        self.output_row.set_selected(
+            names.index(want) + 1 if want in names else 0)
+        self.output_row.handler_unblock(self.output_handler)
+        return GLib.SOURCE_CONTINUE
+
+    def on_output_selected(self, *_):
+        name = self.selected_output()
+        self.settings["output"] = name
+        save_settings(self.settings)
+        if not (self.audio and self.audio.playing):
+            return
+        if name:
+            self.audio.set_output(name)
+        elif not self.audio.recording:
+            self.start_audio()      # back to whatever the system default is
+
+    def on_volume_changed(self, scale):
+        self.settings["volume"] = round(scale.get_value())
+        save_settings(self.settings)
+        if self.audio:
+            self.audio.set_volume(scale.get_value() / 100)
+
+    def current_format(self):
+        i = self.format_row.get_selected()
+        return self.formats[i] if 0 <= i < len(self.formats) else None
+
+    def fill_qualities(self):
+        fmt = self.current_format()
+        if not fmt:
+            return
+        self.quality_model.splice(0, self.quality_model.get_n_items(),
+                                  [label for label, _v in fmt[3]])
+        saved = self.settings.get("quality", {}).get(fmt[0])
+        if not isinstance(saved, int) or not 0 <= saved < len(fmt[3]):
+            saved = DEFAULT_QUALITY.get(fmt[0], 0)
+        self.quality_row.set_selected(saved)
+        self.quality_row.set_sensitive(len(fmt[3]) > 1)
+
+    def on_format_selected(self, *_):
+        fmt = self.current_format()
+        if fmt:
+            self.settings["format"] = fmt[0]
+            save_settings(self.settings)
+            self.fill_qualities()
+
+    def on_quality_selected(self, *_):
+        fmt = self.current_format()
+        i = self.quality_row.get_selected()
+        if fmt and 0 <= i < len(fmt[3]):
+            self.settings.setdefault("quality", {})[fmt[0]] = i
+            save_settings(self.settings)
+
+    def on_rds_setting(self, row, _pspec):
+        self.settings["rds"] = row.get_active()
+        save_settings(self.settings)
+
+    def close_rds_log(self):
+        if self.rds_log:
+            self.rds_log.close()
+            self.rds_log = None
+
+    def set_recording_ui(self, on):
+        self.record_button.set_label("Stop" if on else "Start")
+        if on:
+            self.record_button.remove_css_class("suggested-action")
+            self.record_button.add_css_class("destructive-action")
+        else:
+            self.record_button.remove_css_class("destructive-action")
+            self.record_button.add_css_class("suggested-action")
+            self.record_row.set_subtitle(f"Saved in {recordings_dir()}")
+        if not on:
+            self.close_rds_log()
+        self.format_row.set_sensitive(not on)
+        self.rds_row.set_sensitive(not on)
+        self.quality_row.set_sensitive(
+            not on and len((self.current_format() or (0, 0, 0, []))[3]) > 1)
+
+    def on_record_clicked(self, *_):
+        if not self.audio:
+            return
+        if self.audio.recording:
+            self.record_button.set_sensitive(False)
+            self.audio.stop_recording()
+            return
+        fmt = self.current_format()
+        if not fmt:
+            return
+        if not self.audio.playing:
+            self.toast("Turn Play on to record")
+            return
+        khz = self.radio.frequency_khz() if self.radio else 0
+        name = "".join(c for c in self.rds.name if c.isalnum() or c in " -_")
+        stamp = time.strftime("%Y-%m-%d %H-%M-%S")
+        title = f"FM {khz / 1000:.1f} MHz {name.strip()}".strip()
+        path = os.path.join(recordings_dir(), f"{title} {stamp}.{fmt[2]}")
+        quality = fmt[3][min(self.quality_row.get_selected(),
+                             len(fmt[3]) - 1)][1]
+        if self.audio.start_recording(path, fmt, quality,
+                                      self.on_recording_saved):
+            self.set_recording_ui(True)
+            if self.rds_row.get_active():
+                try:
+                    self.rds_log = RdsLog(os.path.splitext(path)[0],
+                                          True, True, khz)
+                except OSError as e:
+                    self.toast(f"RDS log not written: {e.strerror}")
+
+    def on_recording_saved(self, path, error):
+        self.record_button.set_sensitive(True)
+        self.set_recording_ui(False)
+        if error:
+            self.toast(f"Recording failed: {error}")
+        else:
+            self.toast(f"Saved {os.path.basename(path)}")
 
     def run_blocking(self, fn, done):
         """Run a blocking tuner call off the UI thread."""
@@ -387,8 +1105,12 @@ class RadioWindow(Adw.ApplicationWindow):
             khz = self.radio.high_khz
         self.tune(khz)
 
-    def tune(self, khz):
-        self.run_blocking(lambda: self.radio.tune_khz(khz), self.update_frequency)
+    def tune(self, khz, then=None):
+        def done():
+            self.update_frequency()
+            if then:
+                then()
+        self.run_blocking(lambda: self.radio.tune_khz(khz), done)
 
     def seek(self, upward):
         self.freq_label.set_label("Seeking…")
@@ -433,6 +1155,8 @@ class RadioWindow(Adw.ApplicationWindow):
             return
         self.freq_label.set_label(f"{khz / 1000:.1f} MHz")
         self.rds.reset()
+        if self.rds_log:
+            self.rds_log.tuned(khz)
         self.name_label.set_label("")
         self.text_label.set_label("")
 
@@ -450,17 +1174,29 @@ class RadioWindow(Adw.ApplicationWindow):
         self.stereo_row.set_subtitle(
             "Yes" if t.rxsubchans & V4L2_TUNER_SUB_STEREO else "Mono")
         changed = False
-        for blk, word in self.radio.read_rds():
+        raw, blocks = self.radio.read_rds()
+        for blk, word in blocks:
             changed |= self.rds.feed(blk, word)
+        if self.rds_log:
+            self.rds_log.blocks(raw)
+            self.rds_log.update(self.rds, max(0, t.signal) * 100 / 65535,
+                                bool(t.rxsubchans & V4L2_TUNER_SUB_STEREO))
         if changed:
             self.name_label.set_label(self.rds.name)
             self.text_label.set_label(self.rds.text)
+        if self.audio and self.audio.recording:
+            secs = int(time.monotonic() - self.audio.rec_started)
+            self.record_row.set_subtitle(
+                f"Recording {secs // 60}:{secs % 60:02d}")
         return GLib.SOURCE_CONTINUE
 
     def toast(self, text):
         self.toasts.add_toast(Adw.Toast(title=text))
 
     def on_close(self, *_):
+        if self.audio:
+            self.audio.stop()       # also finishes a recording in progress
+        self.close_rds_log()
         if self.radio:
             try:
                 self.radio.set_ctrl(V4L2_CID_AUDIO_MUTE, 1)

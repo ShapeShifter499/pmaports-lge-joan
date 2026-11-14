@@ -1,12 +1,24 @@
 # Maintainer: Lance <Gero3977@gmail.com>
 pkgname=fm-radio
-pkgver=0.1
+pkgver=0.2
 pkgrel=0
-pkgdesc="Tune a V4L2 FM radio receiver, with RDS and presets (GTK4/libadwaita)"
+pkgdesc="FM radio for V4L2 receivers: listen, record, RDS and presets (GTK4/libadwaita)"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
 license="GPL-3.0-or-later"
-depends="python3 py3-gobject3 gtk4.0 libadwaita"
+# Sound: GStreamer reads the ALSA capture device, plays through the sound
+# server (pulsesink, also served by pipewire-pulse) and encodes recordings;
+# pactl lists the outputs. gst-plugins-bad only adds AAC and is optional.
+depends="
+	gst-plugins-base
+	gst-plugins-good
+	gstreamer
+	gtk4.0
+	libadwaita
+	pulseaudio-utils
+	py3-gobject3
+	python3
+	"
 options="!check"
 source="
 	fm-radio
@@ -22,7 +34,7 @@ package() {
 		"$pkgdir"/usr/share/icons/hicolor/scalable/apps/io.github.ShapeShifter499.FmRadio.svg
 }
 sha512sums="
-2dd0fc8a1f6e9c7c591a96089476873cfed8ac8773c55f7b85bbe176c06118d58578fc230c3d4d1a4d7258b4d600b0a95f14748d3fc26b77f0d052a94f57faf1  fm-radio
+a45bd087e03017db4246cd760c4863897d94feda2d0bdb6798708ad28db8209c1ed241c2c8d38c58c5b82fa5a5aec3b32409d59f8511877bb729d4614546867f  fm-radio
 0008c6d3d9da0386a5ec8aa090dc062d7547fbbe42173b2e7b917322fab2941906ef0d91d6f9e61373afef4a4533bf74148e77c37906913174fab5bb0ad4965f  io.github.ShapeShifter499.FmRadio.desktop
 1c3f8ce57dbc59aca5e0d46be2382475c6f468b0a13e245f84d0aacd9565508c3d4ce993546aa70b502ff55bc2b2e1b8bc3684b9341dc6da3b1421b5bf106322  io.github.ShapeShifter499.FmRadio.svg
 "
