@@ -907,6 +907,13 @@ class RadioWindow(Adw.ApplicationWindow):
         self.region_row.connect("notify::selected", self.on_region_selected)
         status.add(self.region_row)
 
+        self.remember_row = Adw.SwitchRow(
+            title="Remember last station",
+            subtitle="Start on the station you last listened to")
+        self.remember_row.set_active(self.settings.get("remember", True))
+        self.remember_row.connect("notify::active", self.on_remember_toggled)
+        status.add(self.remember_row)
+
         adv = self.settings.get("advanced", {})
         self.advanced_row = Adw.SwitchRow(
             title="Advanced tuning",
@@ -1071,7 +1078,17 @@ class RadioWindow(Adw.ApplicationWindow):
                 self.radio.set_ctrl(cid, val)
             except OSError:
                 pass
-        self.tuning_changed()
+        # Only one tune may be in flight, so settle the band limits first
+        # and tune once, to the remembered station or where the driver is.
+        self.tuning_changed(retune=False)
+        try:
+            start = self.radio.frequency_khz()
+        except OSError:
+            start = 0
+        last = self.settings.get("last_khz")
+        if self.remember_row.get_active() and isinstance(last, int):
+            start = last
+        start = self.snap(start)
         if not self.capture:
             self.audio_row.set_subtitle(
                 "Not available: this kernel has no FM capture device, so "
@@ -1084,11 +1101,11 @@ class RadioWindow(Adw.ApplicationWindow):
                 g.set_sensitive(True)
             # The receiver powers up on the first tuner call, and its audio
             # port only answers once it is on: retune before starting sound.
-            self.tune(self.snap(self.radio.frequency_khz()),
-                      then=self.start_audio)
+            self.tune(start, then=self.start_audio)
             return True
         for g in self.sound_groups:
             g.set_sensitive(False)
+        self.tune(start)
         return True
 
     # sound ---------------------------------------------------------------
@@ -1277,6 +1294,17 @@ class RadioWindow(Adw.ApplicationWindow):
             self.settings.setdefault("quality", {})[fmt[0]] = i
             save_settings(self.settings)
 
+    def on_remember_toggled(self, row, _pspec):
+        self.settings["remember"] = row.get_active()
+        if not row.get_active():
+            self.settings.pop("last_khz", None)
+        elif self.radio:
+            try:
+                self.settings["last_khz"] = self.radio.frequency_khz()
+            except OSError:
+                pass
+        save_settings(self.settings)
+
     def on_rds_setting(self, row, _pspec):
         self.settings["rds"] = row.get_active()
         save_settings(self.settings)
@@ -1419,7 +1447,7 @@ class RadioWindow(Adw.ApplicationWindow):
             deemph = self.region[5]
         return low, high, step, deemph
 
-    def tuning_changed(self):
+    def tuning_changed(self, retune=True):
         """Apply the region or advanced settings to the UI and the tuner."""
         low, high, step, deemph = self.tuning()
         adv = self.settings.get("advanced", {}).get("on", False)
@@ -1439,6 +1467,8 @@ class RadioWindow(Adw.ApplicationWindow):
             self.radio.set_ctrl(V4L2_CID_TUNE_DEEMPHASIS, deemph)
         except OSError:
             pass
+        if not retune:
+            return
         try:
             khz = self.radio.frequency_khz()
         except OSError:
@@ -1538,6 +1568,10 @@ class RadioWindow(Adw.ApplicationWindow):
         except OSError:
             return
         self.freq_label.set_label(f"{fmt_mhz(khz)} MHz")
+        if self.remember_row.get_active() and \
+                self.settings.get("last_khz") != khz:
+            self.settings["last_khz"] = khz
+            save_settings(self.settings)
         self.freq_spin.handler_block(self.freq_handler)
         self.freq_spin.set_value(khz / 1000)
         self.freq_spin.handler_unblock(self.freq_handler)
