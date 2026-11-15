@@ -42,7 +42,6 @@ except (ValueError, ImportError):
 
 APP_ID = "io.github.ShapeShifter499.FmRadio"
 DEVICE = os.environ.get("FM_RADIO_DEVICE", "/dev/radio0")
-STEP_KHZ = 100
 
 # --- V4L2 ------------------------------------------------------------------
 
@@ -92,7 +91,10 @@ V4L2_TUNER_RADIO = 1
 V4L2_TUNER_CAP_LOW = 0x0001
 V4L2_TUNER_SUB_STEREO = 0x0002
 V4L2_CID_AUDIO_MUTE = 0x00980909
+V4L2_CID_TUNE_DEEMPHASIS = 0x00a10901
 V4L2_CID_RDS_RECEPTION = 0x00a10902
+V4L2_DEEMPHASIS_50_uS = 1
+V4L2_DEEMPHASIS_75_uS = 2
 
 
 class Radio:
@@ -127,9 +129,16 @@ class Radio:
                           frequency=self._from_khz(khz))
         fcntl.ioctl(self.fd, VIDIOC_S_FREQUENCY, f)
 
-    def seek(self, upward):
+    def seek(self, upward, low_khz=0, high_khz=0, step_khz=0):
+        # spacing is in Hz (V4L2); 0 leaves the driver default of 100 kHz,
+        # which also works with kernels that read the field wrongly.
         s = V4l2HwFreqSeek(tuner=0, type=V4L2_TUNER_RADIO,
-                           seek_upward=int(upward), wrap_around=1)
+                           seek_upward=int(upward), wrap_around=1,
+                           spacing=0 if step_khz in (0, 100)
+                           else step_khz * 1000,
+                           rangelow=self._from_khz(low_khz) if low_khz else 0,
+                           rangehigh=self._from_khz(high_khz)
+                           if high_khz else 0)
         # The seek blocks until a station is found or the band is swept,
         # which a non-blocking descriptor would turn into EAGAIN.
         flags = fcntl.fcntl(self.fd, fcntl.F_GETFL)
@@ -270,6 +279,11 @@ def _rds_char(c):
     return chr(c) if 0x20 <= c < 0x7f else " "
 
 
+def fmt_mhz(khz):
+    """98.5 or, on a 50 kHz grid, 101.35."""
+    return f"{khz / 1000:.2f}" if khz % 100 else f"{khz / 1000:.1f}"
+
+
 # Programme types: North American RBDS / European RDS (they differ).
 PTY_RBDS = ["None", "News", "Information", "Sports", "Talk", "Rock",
             "Classic Rock", "Adult Hits", "Soft Rock", "Top 40", "Country",
@@ -287,6 +301,42 @@ PTY_RDS = ["None", "News", "Current Affairs", "Information", "Sport",
            "Documentary", "Alarm Test", "Alarm"]
 
 
+# FM broadcast conventions by region: band, channel grid, de-emphasis and
+# which programme-type names RDS uses.
+REGIONS = [
+    ("americas", "Americas, South Korea", 87500, 107900, 200,
+     V4L2_DEEMPHASIS_75_uS, "rbds"),
+    ("world", "Europe, Africa, Asia, Oceania", 87500, 108000, 100,
+     V4L2_DEEMPHASIS_50_uS, "rds"),
+    ("world50", "Europe, 50 kHz channels (Italy and others)", 87500, 108000,
+     50, V4L2_DEEMPHASIS_50_uS, "rds"),
+    ("japan", "Japan", 76000, 95000, 100, V4L2_DEEMPHASIS_50_uS, "rds"),
+]
+REGION_IDS = [r[0] for r in REGIONS]
+_AMERICAS = {"US", "CA", "MX", "KR", "PR", "BR", "AR", "CL", "CO", "PE", "VE",
+             "EC", "BO", "PY", "UY", "GT", "HN", "SV", "NI", "CR", "PA", "DO",
+             "CU", "JM", "BS", "BZ", "HT", "TT"}
+
+
+def default_region():
+    """Guess the region from the locale, e.g. en_US -> americas."""
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        loc = os.environ.get(var, "")
+        if "_" in loc:
+            country = loc.split("_", 1)[1][:2].upper()
+            if country in _AMERICAS:
+                return "americas"
+            if country == "JP":
+                return "japan"
+            return "world"
+    return "americas"
+
+
+def region_summary(r):
+    return (f"{fmt_mhz(r[2])}–{fmt_mhz(r[3])} MHz, {r[4]} kHz channels, "
+            f"{50 if r[5] == V4L2_DEEMPHASIS_50_uS else 75} µs de-emphasis")
+
+
 class RdsLog:
     """RDS written next to a recording: a readable log and/or raw blocks.
 
@@ -296,8 +346,9 @@ class RdsLog:
     including blocks with errors.
     """
 
-    def __init__(self, base, text, raw, khz):
+    def __init__(self, base, text, raw, khz, pty_names="rbds"):
         self.started = time.monotonic()
+        self.pty_names = PTY_RBDS if pty_names == "rbds" else PTY_RDS
         self.text = open(base + ".rds.txt", "w") if text else None
         self.raw = open(base + ".rds", "wb") if raw else None
         self.last = {}
@@ -316,7 +367,7 @@ class RdsLog:
     def tuned(self, khz):
         self.last = {}
         self.pending = {}
-        self.line(f"Tuned {khz / 1000:.1f} MHz")
+        self.line(f"Tuned {fmt_mhz(khz)} MHz")
 
     def blocks(self, data):
         if self.raw and data:
@@ -340,9 +391,8 @@ class RdsLog:
         if rds.pi is not None and self._settled("pi", rds.pi):
             self.line(f"Programme ID {rds.pi:04X}")
         if rds.pty is not None and self._settled("pty", rds.pty):
-            self.line(f"Programme type {rds.pty} "
-                      f"(RBDS: {PTY_RBDS[rds.pty] or '-'}, "
-                      f"RDS: {PTY_RDS[rds.pty]})")
+            self.line(f"Programme type {rds.pty}: "
+                      f"{self.pty_names[rds.pty] or '-'}")
         if rds.tp is not None and self._settled("tp", (rds.tp, rds.ta)):
             self.line(f"Traffic programme {'yes' if rds.tp else 'no'}, "
                       f"announcement {'on' if rds.ta else 'off'}")
@@ -758,6 +808,9 @@ class RadioWindow(Adw.ApplicationWindow):
         self.keep_play_setting = False
         self.audio_retries = 0
         self.rds_log = None
+        rid = self.settings.get("region")
+        self.region = REGIONS[REGION_IDS.index(rid)] if rid in REGION_IDS \
+            else REGIONS[REGION_IDS.index(default_region())]
         self.output_state = {}
         self.default_output = ""
         self.volume_touched = 0.0
@@ -792,8 +845,8 @@ class RadioWindow(Adw.ApplicationWindow):
                           margin_bottom=12)
         for icon, tip, cb in (
                 ("media-skip-backward-symbolic", "Seek down", lambda *_: self.seek(False)),
-                ("go-previous-symbolic", "Down 0.1 MHz", lambda *_: self.step(-STEP_KHZ)),
-                ("go-next-symbolic", "Up 0.1 MHz", lambda *_: self.step(STEP_KHZ)),
+                ("go-previous-symbolic", "Down one channel", lambda *_: self.step(-1)),
+                ("go-next-symbolic", "Up one channel", lambda *_: self.step(1)),
                 ("media-skip-forward-symbolic", "Seek up", lambda *_: self.seek(True))):
             b = Gtk.Button(icon_name=icon, tooltip_text=tip)
             b.add_css_class("circular")
@@ -811,6 +864,12 @@ class RadioWindow(Adw.ApplicationWindow):
         status.add(self.signal_row)
         self.stereo_row = Adw.ActionRow(title="Stereo", subtitle="—")
         status.add(self.stereo_row)
+        self.region_row = Adw.ComboRow(
+            title="Region", subtitle=region_summary(self.region),
+            model=Gtk.StringList.new([r[1] for r in REGIONS]))
+        self.region_row.set_selected(REGIONS.index(self.region))
+        self.region_row.connect("notify::selected", self.on_region_selected)
+        status.add(self.region_row)
         self.audio_row = Adw.ActionRow(title="Sound")
         status.add(self.audio_row)
 
@@ -910,7 +969,8 @@ class RadioWindow(Adw.ApplicationWindow):
             self.freq_label.set_label("—")
             return False
         self.banner.set_revealed(False)
-        for cid, val in ((V4L2_CID_RDS_RECEPTION, 1), (V4L2_CID_AUDIO_MUTE, 0)):
+        for cid, val in ((V4L2_CID_RDS_RECEPTION, 1), (V4L2_CID_AUDIO_MUTE, 0),
+                         (V4L2_CID_TUNE_DEEMPHASIS, self.region[5])):
             try:
                 self.radio.set_ctrl(cid, val)
             except OSError:
@@ -928,7 +988,8 @@ class RadioWindow(Adw.ApplicationWindow):
                 g.set_sensitive(True)
             # The receiver powers up on the first tuner call, and its audio
             # port only answers once it is on: retune before starting sound.
-            self.tune(self.radio.frequency_khz(), then=self.start_audio)
+            self.tune(self.snap(self.radio.frequency_khz()),
+                      then=self.start_audio)
             return True
         for g in self.sound_groups:
             g.set_sensitive(False)
@@ -1145,7 +1206,7 @@ class RadioWindow(Adw.ApplicationWindow):
         khz = self.radio.frequency_khz() if self.radio else 0
         name = "".join(c for c in self.rds.name if c.isalnum() or c in " -_")
         stamp = time.strftime("%Y-%m-%d %H-%M-%S")
-        title = f"FM {khz / 1000:.1f} MHz {name.strip()}".strip()
+        title = f"FM {fmt_mhz(khz)} MHz {name.strip()}".strip()
         path = os.path.join(recordings_dir(), f"{title} {stamp}.{fmt[2]}")
         quality = fmt[3][min(self.quality_row.get_selected(),
                              len(fmt[3]) - 1)][1]
@@ -1155,7 +1216,7 @@ class RadioWindow(Adw.ApplicationWindow):
             if self.rds_row.get_active():
                 try:
                     self.rds_log = RdsLog(os.path.splitext(path)[0],
-                                          True, True, khz)
+                                          True, True, khz, self.region[6])
                 except OSError as e:
                     self.toast(f"RDS log not written: {e.strerror}")
 
@@ -1192,15 +1253,43 @@ class RadioWindow(Adw.ApplicationWindow):
 
     # actions ------------------------------------------------------------
 
-    def step(self, delta_khz):
+    def snap(self, khz):
+        """Nearest channel of the region's grid, inside its band."""
+        _id, _name, low, high, step = self.region[:5]
+        khz = low + round((khz - low) / step) * step
+        return min(max(khz, low), high)
+
+    def step(self, channels):
         if not self.radio:
             return
-        khz = self.radio.frequency_khz() + delta_khz
-        if khz > self.radio.high_khz:
-            khz = self.radio.low_khz
-        elif khz < self.radio.low_khz:
-            khz = self.radio.high_khz
+        _id, _name, low, high, step = self.region[:5]
+        khz = self.snap(self.radio.frequency_khz()) + channels * step
+        if khz > high:
+            khz = low
+        elif khz < low:
+            khz = high
         self.tune(khz)
+
+    def on_region_selected(self, *_):
+        i = self.region_row.get_selected()
+        if not 0 <= i < len(REGIONS) or REGIONS[i] is self.region:
+            return
+        self.region = REGIONS[i]
+        self.region_row.set_subtitle(region_summary(self.region))
+        self.settings["region"] = self.region[0]
+        save_settings(self.settings)
+        if not self.radio:
+            return
+        try:
+            self.radio.set_ctrl(V4L2_CID_TUNE_DEEMPHASIS, self.region[5])
+        except OSError:
+            pass
+        try:
+            khz = self.radio.frequency_khz()
+        except OSError:
+            return
+        if self.snap(khz) != khz:
+            self.tune(self.snap(khz))
 
     def tune(self, khz, then=None):
         def done():
@@ -1211,7 +1300,9 @@ class RadioWindow(Adw.ApplicationWindow):
 
     def seek(self, upward):
         self.freq_label.set_label("Seeking…")
-        self.run_blocking(lambda: self.radio.seek(upward), self.update_frequency)
+        _id, _name, low, high, step = self.region[:5]
+        self.run_blocking(lambda: self.radio.seek(upward, low, high, step),
+                          self.update_frequency)
 
     def on_add_preset(self, *_):
         if not self.radio:
@@ -1226,7 +1317,7 @@ class RadioWindow(Adw.ApplicationWindow):
             self.preset_group.remove(row)
         self.preset_rows = []
         for khz in self.presets:
-            row = Adw.ActionRow(title=f"{khz / 1000:.1f} MHz", activatable=True)
+            row = Adw.ActionRow(title=f"{fmt_mhz(khz)} MHz", activatable=True)
             row.connect("activated", lambda _r, k=khz: self.tune(k))
             rm = Gtk.Button(icon_name="user-trash-symbolic",
                             valign=Gtk.Align.CENTER)
@@ -1250,7 +1341,7 @@ class RadioWindow(Adw.ApplicationWindow):
             khz = self.radio.frequency_khz()
         except OSError:
             return
-        self.freq_label.set_label(f"{khz / 1000:.1f} MHz")
+        self.freq_label.set_label(f"{fmt_mhz(khz)} MHz")
         self.rds.reset()
         if self.rds_log:
             self.rds_log.tuned(khz)
