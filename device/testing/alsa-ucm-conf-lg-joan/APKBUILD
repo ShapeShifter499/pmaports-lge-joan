@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=alsa-ucm-conf-lg-joan
 pkgver=1.0
-pkgrel=15
+pkgrel=16
 pkgdesc="ALSA UCM profile for the LG V30 (joan) sound card"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -43,9 +43,9 @@ package() {
 }
 
 sha512sums="
-cd40816163261e7ecc09cbcbe46cfc7ff841b34fb1490beac7f1af2a6164eb39025d8fd094202510e3e21f9be61e92c2f524b5f1467a8123069dc75b8ac02f92  joan.conf
-a5b7a62edd682d1e5b8b68291a1deed9215519517b425f716a125f1895f5064f2ac8d39e909d63b9102f98fb24e262cd98f440b9c9746387b4206a1cbd52e85f  HiFi.conf
+0c6d961c2ca219e809fae5ccbdfd05e394b036944a9488e3eef98f6adfcaa35b5ca9f07b8adced97d48cd38971d97c3220d8e30c67eeaa351823eb3717d7dc0a  joan.conf
+013e3818ffd1e4720a3ccb66f09d0195ab666cd7c8c2ca7bae1f70b396f4a707991ed81ac39c9ac84aaacf4e0a2173db01d65f2d7ad979774f38e8f837b5f1ec  HiFi.conf
 2eac231f9b684f29d5f2d8299cded7a47d2c2429cb4db66cfbebc115372079a3a02dfcd9fda9d57232f6b2ce35bcc5823175c2831e8e7afc0c471c57dd357938  VoiceCall.conf
-6087c94ef1d8ad5524e5eea42e3ac233f396ef589a6fd3e0d454478978a875e2ca568d8089a76aef88a0a67b37d57446a5573efd12de2f9a86843ababfe4ecce  56-joan-hifi-headphones.conf
+f4907543c3c5b2067b7d838cf39f7df1d23fe0ea44d44df1bf851aed33e76cca2e91e8b0d1532ac03ccae697c5b1b4c50d8f397b56a32c130fb0086f5d50076a  56-joan-hifi-headphones.conf
 58199880acf2efe3e2e78e53d49b67373e60c09217b5cbed5e3c6db48b5d51cf026d980879f3682406c3de494d31927c04df3b682dd600bd33464204aba7433c  57-joan-no-pro-audio.conf
 "
