@@ -870,6 +870,43 @@ class RadioWindow(Adw.ApplicationWindow):
         self.region_row.set_selected(REGIONS.index(self.region))
         self.region_row.connect("notify::selected", self.on_region_selected)
         status.add(self.region_row)
+
+        adv = self.settings.get("advanced", {})
+        self.advanced_row = Adw.SwitchRow(
+            title="Advanced tuning",
+            subtitle="Whole receiver range (76–108 MHz), your own channel "
+                     "size and de-emphasis")
+        self.advanced_row.set_active(adv.get("on", False))
+        self.advanced_row.connect("notify::active", self.on_advanced_toggled)
+        status.add(self.advanced_row)
+        sizes = [f"{k} kHz" for k in self.CHANNEL_SIZES]
+        sizes[0] += " (finest the receiver tunes)"
+        self.channel_row = Adw.ComboRow(
+            title="Channel size", model=Gtk.StringList.new(sizes))
+        self.channel_row.set_selected(
+            self.CHANNEL_SIZES.index(adv.get("step", 50))
+            if adv.get("step", 50) in self.CHANNEL_SIZES else 0)
+        self.channel_row.connect("notify::selected", self.on_channel_size)
+        self.deemph_row = Adw.ComboRow(
+            title="De-emphasis",
+            subtitle="Must match the transmitter: 75 µs in the Americas and "
+                     "South Korea, 50 µs elsewhere",
+            model=Gtk.StringList.new(["50 µs", "75 µs"]))
+        self.deemph_row.set_selected(
+            1 if adv.get("deemph", self.region[5]) == V4L2_DEEMPHASIS_75_uS
+            else 0)
+        self.deemph_row.connect("notify::selected", self.on_deemph)
+        self.freq_spin = Adw.SpinRow.new_with_range(76.0, 108.0, 0.05)
+        self.freq_spin.set_title("Frequency (MHz)")
+        self.freq_spin.set_digits(2)
+        self.freq_spin.set_numeric(True)
+        self.freq_handler = self.freq_spin.connect("notify::value",
+                                                   self.on_freq_spin)
+        self.advanced_rows = (self.channel_row, self.deemph_row,
+                              self.freq_spin)
+        for row in self.advanced_rows:
+            status.add(row)
+            row.set_visible(adv.get("on", False))
         self.audio_row = Adw.ActionRow(title="Sound")
         status.add(self.audio_row)
 
@@ -970,12 +1007,12 @@ class RadioWindow(Adw.ApplicationWindow):
             return False
         self.banner.set_revealed(False)
         for cid, val in ((V4L2_CID_RDS_RECEPTION, 1), (V4L2_CID_AUDIO_MUTE, 0),
-                         (V4L2_CID_TUNE_DEEMPHASIS, self.region[5])):
+                         (V4L2_CID_TUNE_DEEMPHASIS, self.tuning()[3])):
             try:
                 self.radio.set_ctrl(cid, val)
             except OSError:
                 pass
-        self.update_frequency()
+        self.tuning_changed()
         if not self.capture:
             self.audio_row.set_subtitle(
                 "Not available: this kernel has no FM capture device, so "
@@ -1255,14 +1292,14 @@ class RadioWindow(Adw.ApplicationWindow):
 
     def snap(self, khz):
         """Nearest channel of the region's grid, inside its band."""
-        _id, _name, low, high, step = self.region[:5]
+        low, high, step, _deemph = self.tuning()
         khz = low + round((khz - low) / step) * step
         return min(max(khz, low), high)
 
     def step(self, channels):
         if not self.radio:
             return
-        _id, _name, low, high, step = self.region[:5]
+        low, high, step, _deemph = self.tuning()
         khz = self.snap(self.radio.frequency_khz()) + channels * step
         if khz > high:
             khz = low
@@ -1275,13 +1312,54 @@ class RadioWindow(Adw.ApplicationWindow):
         if not 0 <= i < len(REGIONS) or REGIONS[i] is self.region:
             return
         self.region = REGIONS[i]
-        self.region_row.set_subtitle(region_summary(self.region))
         self.settings["region"] = self.region[0]
         save_settings(self.settings)
+        self.tuning_changed()
+
+    # advanced tuning ------------------------------------------------------
+
+    # The receiver tunes in 50 kHz steps (it rounds anything finer down)
+    # and accepts 76-108 MHz; measured on the WCN3990.
+    CHANNEL_SIZES = (50, 100, 200)
+
+    def tuning(self):
+        """(low kHz, high kHz, channel kHz, de-emphasis) in effect."""
+        adv = self.settings.get("advanced", {})
+        if not adv.get("on"):
+            return self.region[2], self.region[3], self.region[4], \
+                self.region[5]
+        low = self.radio.low_khz if self.radio else 76000
+        high = self.radio.high_khz if self.radio else 108000
+        step = adv.get("step", 50)
+        if step not in self.CHANNEL_SIZES:
+            step = 50
+        # Keep the region's channel grid (for example the odd tenths in the
+        # Americas): start the band on a channel of it.
+        low += (self.region[2] - low) % step
+        high -= (high - low) % step
+        deemph = adv.get("deemph", self.region[5])
+        if deemph not in (V4L2_DEEMPHASIS_50_uS, V4L2_DEEMPHASIS_75_uS):
+            deemph = self.region[5]
+        return low, high, step, deemph
+
+    def tuning_changed(self):
+        """Apply the region or advanced settings to the UI and the tuner."""
+        low, high, step, deemph = self.tuning()
+        adv = self.settings.get("advanced", {}).get("on", False)
+        self.region_row.set_subtitle(
+            "Overridden by Advanced tuning" if adv
+            else region_summary(self.region))
+        for row in self.advanced_rows:
+            row.set_visible(adv)
+        self.freq_spin.handler_block(self.freq_handler)
+        self.freq_spin.get_adjustment().configure(
+            self.freq_spin.get_value(), low / 1000, high / 1000,
+            step / 1000, step / 1000 * 10, 0)
+        self.freq_spin.handler_unblock(self.freq_handler)
         if not self.radio:
             return
         try:
-            self.radio.set_ctrl(V4L2_CID_TUNE_DEEMPHASIS, self.region[5])
+            self.radio.set_ctrl(V4L2_CID_TUNE_DEEMPHASIS, deemph)
         except OSError:
             pass
         try:
@@ -1290,6 +1368,47 @@ class RadioWindow(Adw.ApplicationWindow):
             return
         if self.snap(khz) != khz:
             self.tune(self.snap(khz))
+        else:
+            self.update_frequency()
+
+    def set_advanced(self, key, value):
+        self.settings.setdefault("advanced", {})[key] = value
+        save_settings(self.settings)
+        self.tuning_changed()
+
+    def on_advanced_toggled(self, row, _pspec):
+        adv = self.settings.setdefault("advanced", {})
+        if row.get_active() and "deemph" not in adv:
+            adv["deemph"] = self.region[5]     # start from the region
+            self.deemph_row.set_selected(
+                1 if adv["deemph"] == V4L2_DEEMPHASIS_75_uS else 0)
+        self.set_advanced("on", row.get_active())
+
+    def on_channel_size(self, row, _pspec):
+        i = row.get_selected()
+        if 0 <= i < len(self.CHANNEL_SIZES):
+            self.set_advanced("step", self.CHANNEL_SIZES[i])
+
+    def on_deemph(self, row, _pspec):
+        self.set_advanced("deemph", (V4L2_DEEMPHASIS_50_uS,
+                                     V4L2_DEEMPHASIS_75_uS)[row.get_selected()])
+
+    def show_spin_khz(self, khz):
+        self.freq_spin.handler_block(self.freq_handler)
+        self.freq_spin.set_value(khz / 1000)
+        self.freq_spin.handler_unblock(self.freq_handler)
+        return GLib.SOURCE_REMOVE
+
+    def on_freq_spin(self, spin, _pspec):
+        """Typed or nudged frequency: tune it (on the channel grid)."""
+        khz = self.snap(round(spin.get_value() * 1000))
+        try:
+            if self.radio and khz == self.radio.frequency_khz():
+                GLib.idle_add(self.show_spin_khz, khz)  # show the snapped value
+                return
+        except OSError:
+            return
+        self.tune(khz)
 
     def tune(self, khz, then=None):
         def done():
@@ -1300,7 +1419,7 @@ class RadioWindow(Adw.ApplicationWindow):
 
     def seek(self, upward):
         self.freq_label.set_label("Seeking…")
-        _id, _name, low, high, step = self.region[:5]
+        low, high, step, _deemph = self.tuning()
         self.run_blocking(lambda: self.radio.seek(upward, low, high, step),
                           self.update_frequency)
 
@@ -1342,6 +1461,9 @@ class RadioWindow(Adw.ApplicationWindow):
         except OSError:
             return
         self.freq_label.set_label(f"{fmt_mhz(khz)} MHz")
+        self.freq_spin.handler_block(self.freq_handler)
+        self.freq_spin.set_value(khz / 1000)
+        self.freq_spin.handler_unblock(self.freq_handler)
         self.rds.reset()
         if self.rds_log:
             self.rds_log.tuned(khz)

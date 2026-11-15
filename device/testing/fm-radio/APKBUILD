@@ -1,7 +1,7 @@
 # Maintainer: Lance <Gero3977@gmail.com>
 pkgname=fm-radio
 pkgver=0.2
-pkgrel=2
+pkgrel=3
 pkgdesc="FM radio for V4L2 receivers: listen, record, RDS and presets (GTK4/libadwaita)"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -34,7 +34,7 @@ package() {
 		"$pkgdir"/usr/share/icons/hicolor/scalable/apps/io.github.ShapeShifter499.FmRadio.svg
 }
 sha512sums="
-13eff9cdabc9c3daaf9a9c5a6a338ea9489aabc42cdf2b96417bfc05aa2763fa5068bbd603795e9ae7b854d519a6c136d612d6d9abd21699dc7caf50d23151ef  fm-radio
+733d91fc7109789304f4d297ffcbfc642a323d31bc5a3accbdceda4ec30ff2f2e558de2c283ae1e331c7b1e73c7f71b410829843715132ad84fbfef187cd1d4e  fm-radio
 0008c6d3d9da0386a5ec8aa090dc062d7547fbbe42173b2e7b917322fab2941906ef0d91d6f9e61373afef4a4533bf74148e77c37906913174fab5bb0ad4965f  io.github.ShapeShifter499.FmRadio.desktop
 1c3f8ce57dbc59aca5e0d46be2382475c6f468b0a13e245f84d0aacd9565508c3d4ce993546aa70b502ff55bc2b2e1b8bc3684b9341dc6da3b1421b5bf106322  io.github.ShapeShifter499.FmRadio.svg
 "
