@@ -342,14 +342,6 @@ def short_output_name(desc):
     return desc.replace("Built-in Audio ", "")
 
 
-def set_output_mute(sink, muted):
-    try:
-        subprocess.run(["pactl", "set-sink-mute", sink, "1" if muted else "0"],
-                       timeout=5, check=True)
-    except (OSError, subprocess.SubprocessError):
-        pass
-
-
 class ValuePopup:
     """Show a slider's value in a small bubble above the knob while it is
     being moved, and hide it a moment after it stops."""
@@ -908,6 +900,7 @@ class RadioWindow(Adw.ApplicationWindow):
         self.region = REGIONS[REGION_IDS.index(rid)] if rid in REGION_IDS \
             else REGIONS[REGION_IDS.index(default_region())]
         self.output_state = {}
+        self.volume_name, self.volume_muted = "", False
         self.default_output = ""
         self.volume_touched = 0.0
         self.volume_apply_pending = False
@@ -1266,14 +1259,14 @@ class RadioWindow(Adw.ApplicationWindow):
         # the system shows for it, which is not necessarily the default one.
         name = dict(self.outputs).get(sink, "")
         name = short_output_name(name)
-        self.volume_row.set_subtitle(
-            ", ".join(x for x in (name, "muted" if muted else "") if x))
+        self.volume_name, self.volume_muted = name, muted
+        self.show_volume_subtitle(vol)
         self.volume.set_sensitive(vol is not None)
         # Leave the slider alone while a finger is on it.
         if vol is None or time.monotonic() - self.volume_touched < 0.8:
             return
         self.volume.handler_block(self.volume_handler)
-        self.volume_popup.set_quietly(0 if muted else min(vol, 100))
+        self.volume_popup.set_quietly(min(vol, 100))
         self.volume.handler_unblock(self.volume_handler)
 
     def refresh_outputs(self):
@@ -1324,9 +1317,20 @@ class RadioWindow(Adw.ApplicationWindow):
         self.settings["treble_rec"] = row.get_active()
         save_settings(self.settings)
 
-    def on_volume_changed(self, _scale):
+    def show_volume_subtitle(self, vol):
+        """"Speaker · 37%": which output, and its volume, like Treble."""
+        parts = [self.volume_name] if self.volume_name else []
+        if vol is not None:
+            parts.append(f"{vol:.0f}%")
+        text = " · ".join(parts)
+        if self.volume_muted:
+            text += ", muted"
+        self.volume_row.set_subtitle(text)
+
+    def on_volume_changed(self, scale):
         """The slider is the volume of the chosen output itself, the same
         value the system shows; set it there, a few times a second at most."""
+        self.show_volume_subtitle(scale.get_value())
         self.volume_touched = time.monotonic()
         if not self.volume_apply_pending:
             self.volume_apply_pending = True
@@ -1336,16 +1340,9 @@ class RadioWindow(Adw.ApplicationWindow):
         self.volume_apply_pending = False
         sink = self.volume_output()
         if sink:
-            percent = round(self.volume.get_value())
-            set_output_volume(sink, percent)
-            # The bottom of an output's hardware range is not always silent
-            # (the speaker amplifier's lowest step is still audible), so all
-            # the way down means muted, like the system's own sliders.
-            muted = self.output_state.get(sink, (None, False))[1]
-            if percent == 0 and not muted:
-                set_output_mute(sink, True)
-            elif percent > 0 and muted:
-                set_output_mute(sink, False)
+            # Only the output's own volume: whatever 0% means is the sound
+            # system's business, so the app shows and does what it does.
+            set_output_volume(sink, round(self.volume.get_value()))
         return GLib.SOURCE_REMOVE
 
     def current_format(self):
