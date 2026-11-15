@@ -31,7 +31,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
 
 try:
     gi.require_version("Gst", "1.0")
@@ -304,11 +304,11 @@ PTY_RDS = ["None", "News", "Current Affairs", "Information", "Sport",
 # FM broadcast conventions by region: band, channel grid, de-emphasis and
 # which programme-type names RDS uses.
 REGIONS = [
-    ("americas", "Americas, South Korea", 87500, 107900, 200,
+    ("americas", "Americas and South Korea", 87500, 107900, 200,
      V4L2_DEEMPHASIS_75_uS, "rbds"),
-    ("world", "Europe, Africa, Asia, Oceania", 87500, 108000, 100,
+    ("world", "Europe and most of the world", 87500, 108000, 100,
      V4L2_DEEMPHASIS_50_uS, "rds"),
-    ("world50", "Europe, 50 kHz channels (Italy and others)", 87500, 108000,
+    ("world50", "Europe, 50 kHz channels (Italy)", 87500, 108000,
      50, V4L2_DEEMPHASIS_50_uS, "rds"),
     ("japan", "Japan", 76000, 95000, 100, V4L2_DEEMPHASIS_50_uS, "rds"),
 ]
@@ -335,6 +335,66 @@ def default_region():
 def region_summary(r):
     return (f"{fmt_mhz(r[2])}–{fmt_mhz(r[3])} MHz, {r[4]} kHz channels, "
             f"{50 if r[5] == V4L2_DEEMPHASIS_50_uS else 75} µs de-emphasis")
+
+
+def short_output_name(desc):
+    """"Built-in Audio Speaker" -> "Speaker", to fit a phone-width row."""
+    return desc.replace("Built-in Audio ", "")
+
+
+def set_output_mute(sink, muted):
+    try:
+        subprocess.run(["pactl", "set-sink-mute", sink, "1" if muted else "0"],
+                       timeout=5, check=True)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+class ValuePopup:
+    """Show a slider's value in a small bubble above the knob while it is
+    being moved, and hide it a moment after it stops."""
+
+    KNOB_MARGIN = 12    # px from each end of the scale to the knob centre
+
+    def __init__(self, scale, fmt):
+        self.scale, self.fmt = scale, fmt
+        self.label = Gtk.Label()
+        self.pop = Gtk.Popover(child=self.label, autohide=False,
+                               has_arrow=True,
+                               position=Gtk.PositionType.TOP)
+        self.pop.set_can_target(False)
+        self.pop.set_parent(scale)
+        self.hide_id = 0
+        self.handler = scale.connect("value-changed", self._changed)
+        scale.connect("unmap", lambda *_: self.pop.popdown())
+
+    def set_quietly(self, value):
+        """Move the slider without showing the bubble (not the user)."""
+        self.scale.handler_block(self.handler)
+        self.scale.set_value(value)
+        self.scale.handler_unblock(self.handler)
+
+    def _changed(self, scale):
+        if not scale.get_mapped():
+            return
+        adj = scale.get_adjustment()
+        span = (adj.get_upper() - adj.get_lower()) or 1
+        frac = (scale.get_value() - adj.get_lower()) / span
+        width = scale.get_width()
+        x = self.KNOB_MARGIN + frac * max(width - 2 * self.KNOB_MARGIN, 1)
+        rect = Gdk.Rectangle()
+        rect.x, rect.y, rect.width, rect.height = int(x), 0, 1, 1
+        self.label.set_label(self.fmt(scale.get_value()))
+        self.pop.set_pointing_to(rect)
+        self.pop.popup()
+        if self.hide_id:
+            GLib.source_remove(self.hide_id)
+        self.hide_id = GLib.timeout_add(1200, self._hide)
+
+    def _hide(self):
+        self.hide_id = 0
+        self.pop.popdown()
+        return GLib.SOURCE_REMOVE
 
 
 class RdsLog:
@@ -900,8 +960,11 @@ class RadioWindow(Adw.ApplicationWindow):
         status.add(self.signal_row)
         self.stereo_row = Adw.ActionRow(title="Stereo", subtitle="—")
         status.add(self.stereo_row)
+        # The chosen region shows as the subtitle, where a long name can
+        # wrap; on the right it was cut off at phone width.
         self.region_row = Adw.ComboRow(
-            title="Region", subtitle=region_summary(self.region),
+            title="Region", use_subtitle=True,
+            tooltip_text=region_summary(self.region),
             model=Gtk.StringList.new([r[1] for r in REGIONS]))
         self.region_row.set_selected(REGIONS.index(self.region))
         self.region_row.connect("notify::selected", self.on_region_selected)
@@ -922,10 +985,11 @@ class RadioWindow(Adw.ApplicationWindow):
         self.advanced_row.set_active(adv.get("on", False))
         self.advanced_row.connect("notify::active", self.on_advanced_toggled)
         status.add(self.advanced_row)
-        sizes = [f"{k} kHz" for k in self.CHANNEL_SIZES]
-        sizes[0] += " (finest the receiver tunes)"
         self.channel_row = Adw.ComboRow(
-            title="Channel size", model=Gtk.StringList.new(sizes))
+            title="Channel size",
+            subtitle="50 kHz is the finest the receiver tunes",
+            model=Gtk.StringList.new(
+                [f"{k} kHz" for k in self.CHANNEL_SIZES]))
         self.channel_row.set_selected(
             self.CHANNEL_SIZES.index(adv.get("step", 50))
             if adv.get("step", 50) in self.CHANNEL_SIZES else 0)
@@ -962,7 +1026,7 @@ class RadioWindow(Adw.ApplicationWindow):
         self.output_model = Gtk.StringList()
         self.output_row = Adw.ComboRow(
             title="Output", model=self.output_model,
-            subtitle="Works with headphones plugged in as the antenna")
+            subtitle="Headphones can stay in as the antenna")
         self.output_handler = self.output_row.connect(
             "notify::selected", self.on_output_selected)
         sound.add(self.output_row)
@@ -973,6 +1037,7 @@ class RadioWindow(Adw.ApplicationWindow):
         self.volume.set_valign(Gtk.Align.CENTER)
         self.volume_handler = self.volume.connect(
             "value-changed", self.on_volume_changed)
+        self.volume_popup = ValuePopup(self.volume, lambda v: f"{v:.0f}%")
         self.volume_row.add_suffix(self.volume)
         sound.add(self.volume_row)
         self.treble_row = Adw.ActionRow(title="Treble")
@@ -980,9 +1045,13 @@ class RadioWindow(Adw.ApplicationWindow):
             Gtk.Orientation.HORIZONTAL, -12, 12, 0.5)
         self.treble.set_hexpand(True)
         self.treble.set_valign(Gtk.Align.CENTER)
-        self.treble.add_mark(0, Gtk.PositionType.BOTTOM, None)
+        self.treble.set_has_origin(False)   # no fill from one end: 0 is centre
+        for mark, text in ((-12, "−12 dB"), (0, "0"), (12, "+12 dB")):
+            self.treble.add_mark(mark, Gtk.PositionType.BOTTOM, text)
         self.treble.set_value(self.settings.get("treble", 0.0))
         self.treble.connect("value-changed", self.on_treble_changed)
+        self.treble_popup = ValuePopup(
+            self.treble, lambda v: "Flat" if v == 0 else f"{v:+.1f} dB")
         reset = Gtk.Button(icon_name="edit-undo-symbolic",
                            tooltip_text="Flat (0 dB)",
                            valign=Gtk.Align.CENTER)
@@ -1191,14 +1260,20 @@ class RadioWindow(Adw.ApplicationWindow):
         return self.selected_output() or self.default_output
 
     def show_volume(self):
-        vol, muted = self.output_state.get(self.volume_output(), (None, False))
-        self.volume_row.set_subtitle("Muted" if muted else "")
+        sink = self.volume_output()
+        vol, muted = self.output_state.get(sink, (None, False))
+        # Name the output: it is that output's own volume, the same number
+        # the system shows for it, which is not necessarily the default one.
+        name = dict(self.outputs).get(sink, "")
+        name = short_output_name(name)
+        self.volume_row.set_subtitle(
+            ", ".join(x for x in (name, "muted" if muted else "") if x))
         self.volume.set_sensitive(vol is not None)
         # Leave the slider alone while a finger is on it.
         if vol is None or time.monotonic() - self.volume_touched < 0.8:
             return
         self.volume.handler_block(self.volume_handler)
-        self.volume.set_value(min(vol, 100))
+        self.volume_popup.set_quietly(0 if muted else min(vol, 100))
         self.volume.handler_unblock(self.volume_handler)
 
     def refresh_outputs(self):
@@ -1212,7 +1287,7 @@ class RadioWindow(Adw.ApplicationWindow):
         self.output_row.handler_block(self.output_handler)
         self.output_model.splice(
             0, self.output_model.get_n_items(),
-            ["System default"] + [desc for _name, desc in outputs])
+            ["System default"] + [short_output_name(desc) for _name, desc in outputs])
         names = [name for name, _desc in outputs]
         self.output_row.set_selected(
             names.index(want) + 1 if want in names else 0)
@@ -1261,7 +1336,16 @@ class RadioWindow(Adw.ApplicationWindow):
         self.volume_apply_pending = False
         sink = self.volume_output()
         if sink:
-            set_output_volume(sink, round(self.volume.get_value()))
+            percent = round(self.volume.get_value())
+            set_output_volume(sink, percent)
+            # The bottom of an output's hardware range is not always silent
+            # (the speaker amplifier's lowest step is still audible), so all
+            # the way down means muted, like the system's own sliders.
+            muted = self.output_state.get(sink, (None, False))[1]
+            if percent == 0 and not muted:
+                set_output_mute(sink, True)
+            elif percent > 0 and muted:
+                set_output_mute(sink, False)
         return GLib.SOURCE_REMOVE
 
     def current_format(self):
@@ -1451,9 +1535,9 @@ class RadioWindow(Adw.ApplicationWindow):
         """Apply the region or advanced settings to the UI and the tuner."""
         low, high, step, deemph = self.tuning()
         adv = self.settings.get("advanced", {}).get("on", False)
-        self.region_row.set_subtitle(
-            "Overridden by Advanced tuning" if adv
-            else region_summary(self.region))
+        # greyed out while Advanced tuning decides instead
+        self.region_row.set_sensitive(not adv)
+        self.region_row.set_tooltip_text(region_summary(self.region))
         for row in self.advanced_rows:
             row.set_visible(adv)
         self.freq_spin.handler_block(self.freq_handler)
