@@ -637,6 +637,31 @@ class Audio:
         self.rec = None        # (pipeline, appsrc, path, done callback)
         self.rec_frames = 0
         self.rec_started = 0.0
+        self.treble_db = 0.0
+        self.rec_treble = None  # the recording's equaliser, if it has one
+
+    # Treble is a high shelf from about 3 kHz up: where the 50 and 75 us
+    # de-emphasis curves part (they differ by about 3.4 dB at 15 kHz, the
+    # top of FM audio). The equaliser's first band is a low shelf and its
+    # last a high shelf; the low one stays flat.
+    TREBLE_HZ = 3000
+    TREBLE_EQ = "equalizer-nbands num-bands=2"
+
+    @classmethod
+    def _setup_treble(cls, eq, db):
+        low, high = eq.get_child_by_index(0), eq.get_child_by_index(1)
+        low.set_property("freq", 60.0)
+        low.set_property("gain", 0.0)
+        high.set_property("freq", float(cls.TREBLE_HZ))
+        high.set_property("gain", float(db))
+
+    def set_treble(self, db):
+        """Treble in dB on playback, and on the recording if it has it."""
+        self.treble_db = db
+        for eq in (self.pipeline.get_by_name("treble")
+                   if self.pipeline else None, self.rec_treble):
+            if eq is not None:
+                eq.get_child_by_index(1).set_property("gain", float(db))
 
     @property
     def playing(self):
@@ -655,6 +680,7 @@ class Audio:
                 # 10 ms of live audio to the clock leaves it no slack, and an
                 # output that works in large chunks (the speaker takes 130 ms
                 # at a time) then drops a quarter of the audio as "late".
+                f"audioconvert ! {self.TREBLE_EQ} name=treble ! "
                 "audioconvert ! pulsesink name=out sync=false "
                 "t. ! queue max-size-time=2000000000 leaky=downstream ! "
                 "appsink name=tap emit-signals=true sync=false async=false "
@@ -666,6 +692,7 @@ class Audio:
             self.on_error(e.message)
             return False
         self.sink = self.pipeline.get_by_name("out")
+        self._setup_treble(self.pipeline.get_by_name("treble"), self.treble_db)
         self.sink.set_property("client-name", "FM Radio")
         props = Gst.Structure.new_empty("props")
         props.set_value("media.role", "music")
@@ -732,13 +759,16 @@ class Audio:
         _move_own_stream(output)
         self.sink.set_property("volume", 1.0)
 
-    def start_recording(self, path, fmt, quality, done=None):
+    def start_recording(self, path, fmt, quality, done=None, treble=False):
         """Record to path; done(path, error) is called when the file is
-        complete, whether it was stopped or failed."""
+        complete, whether it was stopped or failed. With treble, the
+        recording gets the same treble setting as playback."""
         if not self.pipeline or self.rec:
             return False
+        eq = (f"{self.TREBLE_EQ} name=treble ! audioconvert ! "
+              if treble else "")
         desc = (f"appsrc name=in format=time caps=\"{self.CAPS}\" "
-                "block=false max-bytes=4000000 ! audioconvert ! "
+                "block=false max-bytes=4000000 ! audioconvert ! " + eq
                 + fmt[4].format(q=quality) + " ! filesink name=file")
         try:
             pipeline = Gst.parse_launch(desc)
@@ -747,6 +777,9 @@ class Audio:
             return False
         os.makedirs(os.path.dirname(path), exist_ok=True)
         pipeline.get_by_name("file").set_property("location", path)
+        self.rec_treble = pipeline.get_by_name("treble")
+        if self.rec_treble is not None:
+            self._setup_treble(self.rec_treble, self.treble_db)
         bus = pipeline.get_bus()
         bus.add_signal_watch()
         bus.connect("message::eos", self._on_rec_message)
@@ -776,6 +809,7 @@ class Audio:
             rec, self.rec = self.rec, None
         if not rec:
             return
+        self.rec_treble = None
         pipeline, src, path, done = rec
         if wait:
             # Closing down: end the stream and give the file time to close.
@@ -803,6 +837,8 @@ class RadioWindow(Adw.ApplicationWindow):
         self.settings = load_settings()
         self.capture = find_fm_capture()
         self.audio = Audio(self.on_audio_error) if Gst else None
+        if self.audio:
+            self.audio.treble_db = self.settings.get("treble", 0.0)
         self.outputs = []
         self.formats = available_formats()
         self.keep_play_setting = False
@@ -932,6 +968,23 @@ class RadioWindow(Adw.ApplicationWindow):
             "value-changed", self.on_volume_changed)
         self.volume_row.add_suffix(self.volume)
         sound.add(self.volume_row)
+        self.treble_row = Adw.ActionRow(title="Treble")
+        self.treble = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL, -12, 12, 0.5)
+        self.treble.set_hexpand(True)
+        self.treble.set_valign(Gtk.Align.CENTER)
+        self.treble.add_mark(0, Gtk.PositionType.BOTTOM, None)
+        self.treble.set_value(self.settings.get("treble", 0.0))
+        self.treble.connect("value-changed", self.on_treble_changed)
+        reset = Gtk.Button(icon_name="edit-undo-symbolic",
+                           tooltip_text="Flat (0 dB)",
+                           valign=Gtk.Align.CENTER)
+        reset.add_css_class("flat")
+        reset.connect("clicked", lambda *_: self.treble.set_value(0))
+        self.treble_row.add_suffix(self.treble)
+        self.treble_row.add_suffix(reset)
+        sound.add(self.treble_row)
+        self.show_treble()
 
         record = Adw.PreferencesGroup(title="Record")
         page.add(record)
@@ -959,6 +1012,12 @@ class RadioWindow(Adw.ApplicationWindow):
         self.rds_row.set_active(self.settings.get("rds", False))
         self.rds_row.connect("notify::active", self.on_rds_setting)
         record.add(self.rds_row)
+        self.rec_treble_row = Adw.SwitchRow(
+            title="Apply treble to recordings",
+            subtitle="Off: recordings keep the audio exactly as received")
+        self.rec_treble_row.set_active(self.settings.get("treble_rec", False))
+        self.rec_treble_row.connect("notify::active", self.on_rec_treble)
+        record.add(self.rec_treble_row)
         self.record_row = Adw.ActionRow(
             title="Record", subtitle=f"Saved in {recordings_dir()}")
         self.record_button = Gtk.Button(label="Start",
@@ -1157,6 +1216,22 @@ class RadioWindow(Adw.ApplicationWindow):
         elif not self.audio.recording:
             self.start_audio()      # back to whatever the system default is
 
+    def show_treble(self):
+        db = self.treble.get_value()
+        self.treble_row.set_subtitle("Flat" if db == 0 else f"{db:+.1f} dB")
+
+    def on_treble_changed(self, scale):
+        db = round(scale.get_value() * 2) / 2
+        self.settings["treble"] = db
+        save_settings(self.settings)
+        self.show_treble()
+        if self.audio:
+            self.audio.set_treble(db)
+
+    def on_rec_treble(self, row, _pspec):
+        self.settings["treble_rec"] = row.get_active()
+        save_settings(self.settings)
+
     def on_volume_changed(self, _scale):
         """The slider is the volume of the chosen output itself, the same
         value the system shows; set it there, a few times a second at most."""
@@ -1224,6 +1299,7 @@ class RadioWindow(Adw.ApplicationWindow):
             self.close_rds_log()
         self.format_row.set_sensitive(not on)
         self.rds_row.set_sensitive(not on)
+        self.rec_treble_row.set_sensitive(not on)
         self.quality_row.set_sensitive(
             not on and len((self.current_format() or (0, 0, 0, []))[3]) > 1)
 
@@ -1248,7 +1324,8 @@ class RadioWindow(Adw.ApplicationWindow):
         quality = fmt[3][min(self.quality_row.get_selected(),
                              len(fmt[3]) - 1)][1]
         if self.audio.start_recording(path, fmt, quality,
-                                      self.on_recording_saved):
+                                      self.on_recording_saved,
+                                      self.rec_treble_row.get_active()):
             self.set_recording_ui(True)
             if self.rds_row.get_active():
                 try:
@@ -1509,10 +1586,9 @@ class RadioWindow(Adw.ApplicationWindow):
             self.audio.stop()       # also finishes a recording in progress
         self.close_rds_log()
         if self.radio:
-            try:
-                self.radio.set_ctrl(V4L2_CID_AUDIO_MUTE, 1)
-            except OSError:
-                pass
+            # No mute here: the receiver powers off when the last handle
+            # closes, and a mute left set would silence the next program
+            # that does not unmute it.
             self.radio.close()
         return False
 
