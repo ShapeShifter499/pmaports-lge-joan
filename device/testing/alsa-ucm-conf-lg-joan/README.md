@@ -13,7 +13,8 @@ Poco F1, SHIFT6mq):
 
 ```
 ucm2/LG/joan/joan.conf          entry point: use case list + BootSequence
-ucm2/LG/joan/HiFi.conf          the HiFi verb and its devices
+ucm2/LG/joan/HiFi.conf          the HiFi verb and its headphone outputs
+ucm2/LG/joan/HiFi-devices.conf  the HiFi verb's other devices
 ucm2/conf.d/sdm845/LG-V30.conf  -> ../../LG/joan/joan.conf
 ```
 
@@ -38,8 +39,18 @@ path. Selecting one output never re-routes another.
 | Top Microphone | hw:,3 MM4 | ADC3 -> DEC7 -> TX7 -> AIF2_CAP / SLIMBUS_1_TX | 150 |
 | Headset Microphone | hw:,5 MM6 | ADC2 -> DEC0 -> TX0 -> AIF3_CAP / SLIMBUS_2_TX | 100 |
 
-The two headphone devices conflict, because both drive the jack through the
-ES9218P mode pins.
+The two headphone outputs share the jack, through the ES9218P, but they do
+not conflict. The verb puts the ES9218P in "HiFi" mode once; in that mode the
+es9218p driver stays in Low Power Bypass, passing the codec's headphone output
+through, until a stream powers its DAC, and goes back to bypass when that
+stream stops. So both show up side by side in the system's output list under
+the one "Music and media" profile, and WirePlumber remembers the choice.
+
+Switching a playing stream from the Hi-Fi DAC to the regular headphones leaves
+a gap until the DAC's PCM closes. `56-joan-hifi-headphones.conf` sets that
+sink's suspend timeout to 1 s (WirePlumber's default is 5 s). The ES9218P's
+switch between its DAC and bypass makes a small audible click, mostly on the
+way to the DAC.
 
 ## Kernel requirements
 

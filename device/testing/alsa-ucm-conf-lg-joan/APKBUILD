@@ -2,7 +2,7 @@
 maintainer="Lance <Gero3977@gmail.com>"
 pkgname=alsa-ucm-conf-lg-joan
 pkgver=1.0
-pkgrel=17
+pkgrel=18
 pkgdesc="ALSA UCM profile for the LG V30 (joan) sound card"
 url="https://github.com/ShapeShifter499/lg-v30-joan-pmos-packages"
 arch="noarch"
@@ -16,7 +16,6 @@ options="!check"
 source="
 	joan.conf
 	HiFi.conf
-	HiFiDAC.conf
 	HiFi-devices.conf
 	VoiceCall.conf
 	56-joan-hifi-headphones.conf
@@ -32,8 +31,6 @@ package() {
 		"$pkgdir"/usr/share/alsa/ucm2/LG/joan/joan.conf
 	install -Dm644 "$srcdir"/HiFi.conf \
 		"$pkgdir"/usr/share/alsa/ucm2/LG/joan/HiFi.conf
-	install -Dm644 "$srcdir"/HiFiDAC.conf \
-		"$pkgdir"/usr/share/alsa/ucm2/LG/joan/HiFiDAC.conf
 	install -Dm644 "$srcdir"/HiFi-devices.conf \
 		"$pkgdir"/usr/share/alsa/ucm2/LG/joan/HiFi-devices.conf
 	install -Dm644 "$srcdir"/VoiceCall.conf \
@@ -49,11 +46,10 @@ package() {
 }
 
 sha512sums="
-b62f4a73fd4acc5cc7c414a15fe57bb21a35994f2ecb152dff8133f17415d40757f6d032efdeaa64fdf0b009ccf0e25d0477cc986d72134c3128a4564377dbf1  joan.conf
-c612bc69e80d856edb1f339b1baa150ba59a090ea52ec7826f46752e0ebd91fdd0a5bc7d450d2c9de1cec5ac644ddd5483f9b277bd300351e2cb7fc996358eaf  HiFi.conf
-b3a2e1165ea2621feb733762c69ab1a062edec89c475a80a81b516917ec819c47a778a5bc5e2ac4777f60648d7af749fafd22ff164939d57144d3f0ca450bc68  HiFiDAC.conf
-c449c02d19517cad30f7d25fb61caf92edad356a1dd086d5f1293c845ec9871b1ea8ea7b3c74092f6c3519e71140d70bcfe03c2d9367fe669375e4af04378f3d  HiFi-devices.conf
+0c6d961c2ca219e809fae5ccbdfd05e394b036944a9488e3eef98f6adfcaa35b5ca9f07b8adced97d48cd38971d97c3220d8e30c67eeaa351823eb3717d7dc0a  joan.conf
+b821ba6b74136dc1416c7cd33fd860eeca1fd6dfcb9706ecaa4f78af8daccf0f7cf8416fff9755d36ad759a88f719deebe58af94a181eaac333ac3ec8c62a45b  HiFi.conf
+b61892e15c885ad58b192b383a2f60337b197d213cf71badb0ad953366de5cf291def6fe396c7790c64864a1f28c31c274c5b9a683db57ed247e23a10d2fa9b1  HiFi-devices.conf
 2eac231f9b684f29d5f2d8299cded7a47d2c2429cb4db66cfbebc115372079a3a02dfcd9fda9d57232f6b2ce35bcc5823175c2831e8e7afc0c471c57dd357938  VoiceCall.conf
-6ca10f6f6dd2847f41f9d5aec34daad339d4d5b3e6884b730e7ada17cd4a1362dde008022b3c18343e91516761853c67ab8db138905e30cabc4fda78b906158b  56-joan-hifi-headphones.conf
+4adcfba8bb748a9df51aba70ca96a1bbb79e0fb6463a171acd7db2121f8775d711ee36c136605572fb6a3ccc8ad6a9e963c6841e3eea0ecf6eeba8fd219d685e  56-joan-hifi-headphones.conf
 58199880acf2efe3e2e78e53d49b67373e60c09217b5cbed5e3c6db48b5d51cf026d980879f3682406c3de494d31927c04df3b682dd600bd33464204aba7433c  57-joan-no-pro-audio.conf
 "
